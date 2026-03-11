@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 show:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.vapi.ai)",
+      "Bash(pip install:*)",
+      "Bash(python -m pytest tests/ -v)"
+    ]
+  }
+}
