@@ -8,9 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
-from openai import AsyncOpenAI
-
-from src.config import settings
+from src.config import get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.learning.evaluator import evaluate_conversation
 from src.learning.metrics import DEFAULT_METRIC_CONFIGS, MetricConfig
@@ -292,11 +290,11 @@ class MetaEvaluator:
 
     async def _check_compliance_blind_spots(self) -> MetaEvalFinding | None:
         """Generate adversarial borderline cases and test compliance checker."""
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        client = get_openai_client()
 
         # Ask LLM to generate borderline compliance violations
         response = await client.chat.completions.create(
-            model=settings.openai_model_mini,
+            model=settings.azure_openai_deployment_mini,
             messages=[{
                 "role": "user",
                 "content": """Generate 3 debt collections agent messages that are BORDERLINE compliance violations.
@@ -317,7 +315,7 @@ Format as JSON: {"messages": [{"text": "...", "expected_violation": "rule_name"}
                 "meta_compliance",
                 response.usage.prompt_tokens,
                 response.usage.completion_tokens,
-                settings.openai_model_mini,
+                settings.azure_openai_deployment_mini,
             )
 
         try:

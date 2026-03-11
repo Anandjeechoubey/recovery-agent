@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from openai import AsyncAzureOpenAI
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
-    openai_model_mini: str = "gpt-4o-mini"
+    # Azure OpenAI
+    azure_openai_endpoint: str = ""
+    azure_openai_api_key: str = ""
+    azure_openai_api_version: str = "2025-04-01-preview"
+
+    # Deployment names — these map to your Azure-hosted model deployments
+    azure_openai_deployment: str = "gpt-4o"
+    azure_openai_deployment_mini: str = "gpt-4o-mini"
 
     vapi_api_key: str = ""
     vapi_phone_number_id: str = ""
@@ -33,3 +41,12 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def get_openai_client() -> AsyncAzureOpenAI:
+    """Create an Azure OpenAI async client."""
+    return AsyncAzureOpenAI(
+        azure_endpoint=settings.azure_openai_endpoint,
+        api_key=settings.azure_openai_api_key,
+        api_version=settings.azure_openai_api_version,
+    )

@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, Request
 
+from src.config import settings
 from src.workflow.activities import get_manager
 
 logger = logging.getLogger(__name__)
@@ -36,8 +37,8 @@ async def vapi_webhook(request: Request):
         return {
             "assistant": {
                 "model": {
-                    "provider": "openai",
-                    "model": "gpt-4o",
+                    "provider": "azure-openai",
+                    "model": settings.azure_openai_deployment,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                     ],

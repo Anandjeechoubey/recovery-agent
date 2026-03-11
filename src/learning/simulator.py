@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from openai import AsyncOpenAI
-
 from src.agents.assessment import AssessmentAgent
 from src.agents.base import BaseAgent
 from src.agents.final_notice import FinalNoticeAgent
 from src.agents.resolution import ResolutionAgent
-from src.config import settings
+from src.config import get_openai_client, settings
 from src.context.summarizer import summarize_for_handoff
 from src.learning.cost_tracker import CostTracker
 from src.learning.personas import BorrowerPersona
@@ -60,7 +58,7 @@ async def simulate_conversation(
     seed: int | None = None,
 ) -> Conversation:
     """Simulate a multi-turn conversation between an agent and a borrower persona."""
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = get_openai_client()
     conversation = Conversation(
         borrower_id=borrower.id,
         agent_type=agent.agent_type,
@@ -83,7 +81,7 @@ async def simulate_conversation(
                 borrower_messages.append({"role": "assistant", "content": msg.content})
 
         kwargs = {
-            "model": settings.openai_model_mini,
+            "model": settings.azure_openai_deployment_mini,
             "messages": borrower_messages,
             "max_tokens": 200,
             "temperature": 0.8,
@@ -101,7 +99,7 @@ async def simulate_conversation(
                     f"sim_borrower_{agent.agent_type}",
                     usage.prompt_tokens,
                     usage.completion_tokens,
-                    settings.openai_model_mini,
+                    settings.azure_openai_deployment_mini,
                 )
 
         conversation.add_message("borrower", borrower_text)
@@ -119,7 +117,7 @@ async def simulate_conversation(
                 f"sim_agent_{agent.agent_type}",
                 500,  # Approximate input tokens
                 agent_msg.token_count,
-                settings.openai_model,
+                settings.azure_openai_deployment,
             )
 
         # Check if agent signals end
@@ -153,7 +151,7 @@ async def simulate_pipeline(
     # Handoff 1→2
     handoff_1to2 = await summarize_for_handoff([conv1])
     if cost_tracker:
-        cost_tracker.record("handoff_1to2", 300, handoff_1to2.token_count, settings.openai_model_mini)
+        cost_tracker.record("handoff_1to2", 300, handoff_1to2.token_count, settings.azure_openai_deployment_mini)
     result.handoff_summaries.append(handoff_1to2)
 
     # Stage 2: Resolution (simulated as chat)
@@ -178,7 +176,7 @@ async def simulate_pipeline(
     # Handoff 2→3
     handoff_2to3 = await summarize_for_handoff([conv1, conv2])
     if cost_tracker:
-        cost_tracker.record("handoff_2to3", 500, handoff_2to3.token_count, settings.openai_model_mini)
+        cost_tracker.record("handoff_2to3", 500, handoff_2to3.token_count, settings.azure_openai_deployment_mini)
     result.handoff_summaries.append(handoff_2to3)
 
     # Stage 3: Final Notice

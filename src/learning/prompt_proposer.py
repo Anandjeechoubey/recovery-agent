@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import json
 
-from openai import AsyncOpenAI
-
-from src.config import settings
+from src.config import get_openai_client, settings
 from src.context.token_budget import count_tokens
 from src.learning.cost_tracker import CostTracker
 
@@ -75,9 +73,9 @@ async def propose_prompt_mutation(
         max_tokens=max_tokens,
     )
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = get_openai_client()
     response = await client.chat.completions.create(
-        model=settings.openai_model_mini,
+        model=settings.azure_openai_deployment_mini,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
         temperature=0.7,
@@ -89,7 +87,7 @@ async def propose_prompt_mutation(
             f"propose_{agent_type}",
             response.usage.prompt_tokens,
             response.usage.completion_tokens,
-            settings.openai_model_mini,
+            settings.azure_openai_deployment_mini,
         )
 
     try:

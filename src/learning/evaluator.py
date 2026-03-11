@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import json
 
-from openai import AsyncOpenAI
-
-from src.config import settings
+from src.config import get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.models.conversation import Conversation
 
@@ -89,9 +87,9 @@ async def evaluate_conversation(
         metrics_to_score=metrics_text,
     )
 
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client = get_openai_client()
     response = await client.chat.completions.create(
-        model=settings.openai_model_mini,
+        model=settings.azure_openai_deployment_mini,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=500,
         temperature=0.1,
@@ -103,7 +101,7 @@ async def evaluate_conversation(
             f"eval_{agent_type}",
             response.usage.prompt_tokens,
             response.usage.completion_tokens,
-            settings.openai_model_mini,
+            settings.azure_openai_deployment_mini,
         )
 
     try:

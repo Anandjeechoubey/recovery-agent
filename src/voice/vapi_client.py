@@ -32,8 +32,8 @@ class VapiClient:
             "customer": {"number": phone_number},
             "assistant": {
                 "model": {
-                    "provider": "openai",
-                    "model": settings.openai_model,
+                    "provider": "azure-openai",
+                    "model": settings.azure_openai_deployment,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                     ],
