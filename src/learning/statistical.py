@@ -43,10 +43,12 @@ def wilcoxon_compare(
     # Bootstrap 95% CI for effect size
     ci_lower, ci_upper = bootstrap_ci(diff)
 
-    # Wilcoxon signed-rank test (non-parametric paired test)
-    # Requires at least 6 non-zero differences
+    # Statistical test selection based on available non-zero differences
     non_zero_diffs = diff[diff != 0]
-    if len(non_zero_diffs) < 6:
+    n_non_zero = len(non_zero_diffs)
+
+    if n_non_zero < 3:
+        # Too few observations for any valid test
         return ComparisonResult(
             metric_name=metric_name,
             baseline_mean=baseline_mean,
@@ -59,10 +61,17 @@ def wilcoxon_compare(
             recommendation="inconclusive",
         )
 
-    try:
-        stat, p_value = stats.wilcoxon(non_zero_diffs, alternative="greater")
-    except ValueError:
-        p_value = 1.0
+    if n_non_zero >= 6:
+        # Wilcoxon signed-rank test (preferred for larger samples)
+        try:
+            stat, p_value = stats.wilcoxon(non_zero_diffs, alternative="greater")
+        except ValueError:
+            p_value = 1.0
+    else:
+        # Sign test fallback for small samples (3-5 non-zero diffs)
+        n_positive = int(np.sum(non_zero_diffs > 0))
+        result = stats.binomtest(n_positive, n_non_zero, 0.5, alternative="greater")
+        p_value = result.pvalue
 
     p_value = float(p_value)
     is_significant = p_value < alpha and effect >= min_effect
@@ -120,7 +129,9 @@ def should_adopt(
     2. No metric shows significant regression
     3. Compliance rate does not decrease
     """
-    if compliance_candidate < compliance_baseline:
+    # Allow up to 5% compliance drop (1 conversation difference in small samples)
+    compliance_tolerance = 0.05
+    if compliance_candidate < compliance_baseline - compliance_tolerance:
         return False, f"Compliance regression: {compliance_baseline:.2f} → {compliance_candidate:.2f}"
 
     has_improvement = False

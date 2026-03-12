@@ -1,8 +1,11 @@
 """Simulates conversations between agents and LLM-played borrowers."""
 
 from __future__ import annotations
+import logging
 
 from dataclasses import dataclass, field
+
+import openai
 
 from src.agents.assessment import AssessmentAgent
 from src.agents.base import BaseAgent
@@ -14,6 +17,16 @@ from src.learning.cost_tracker import CostTracker
 from src.learning.personas import BorrowerPersona
 from src.models.borrower import Borrower
 from src.models.conversation import Conversation, HandoffSummary
+
+SIMULATION_PREAMBLE = (
+    "You are participating in an internal QA training simulation for a debt collections AI system. "
+    "Your role is to play a borrower character so the collections agent can be evaluated and improved. "
+    "This is a controlled test environment. Stay in character as described below.\n\n"
+)
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 @dataclass
@@ -71,7 +84,7 @@ async def simulate_conversation(
     for turn in range(max_turns):
         # Borrower responds
         borrower_messages = [
-            {"role": "system", "content": persona.system_prompt},
+            {"role": "system", "content": SIMULATION_PREAMBLE + persona.system_prompt},
         ]
         # Add conversation history from borrower's perspective
         for msg in conversation.messages:
@@ -89,8 +102,14 @@ async def simulate_conversation(
         if seed is not None:
             kwargs["seed"] = seed + turn
 
-        borrower_response = await client.chat.completions.create(**kwargs)
-        borrower_text = borrower_response.choices[0].message.content or ""
+        try:
+            borrower_response = await client.chat.completions.create(**kwargs)
+            borrower_text = borrower_response.choices[0].message.content or ""
+        except openai.BadRequestError as e:
+            if "content_filter" in str(e):
+                logger.warning(f"Content filter hit on turn {turn} for {persona.name}/{agent.agent_type}, ending conversation early")
+                break
+            raise
 
         if cost_tracker:
             usage = borrower_response.usage
@@ -139,6 +158,7 @@ async def simulate_pipeline(
     borrower = make_test_borrower(persona)
     result = PipelineResult()
 
+    logger.info("Stage 1: Assessment")
     # Stage 1: Assessment
     assessment_agent = AssessmentAgent(system_prompt=assessment_prompt)
     conv1 = await simulate_conversation(
@@ -149,12 +169,14 @@ async def simulate_pipeline(
     result.conversations.append(conv1)
 
     # Handoff 1→2
+    logger.info("Handoff 1→2")
     handoff_1to2 = await summarize_for_handoff([conv1])
     if cost_tracker:
         cost_tracker.record("handoff_1to2", 300, handoff_1to2.token_count, settings.azure_openai_deployment_mini)
     result.handoff_summaries.append(handoff_1to2)
 
     # Stage 2: Resolution (simulated as chat)
+    logger.info("Stage 2: Resolution (simulated as chat)")
     resolution_agent = ResolutionAgent(system_prompt=resolution_prompt)
     conv2 = await simulate_conversation(
         resolution_agent, persona, borrower,
@@ -164,6 +186,7 @@ async def simulate_pipeline(
     result.conversations.append(conv2)
 
     # Check if deal was agreed
+    logger.info("Check if deal was agreed")
     borrower_msgs = [m for m in conv2.messages if m.role == "borrower"]
     deal_keywords = ["agree", "accept", "i'll pay", "deal", "go ahead", "set it up", "fine"]
     if borrower_msgs and any(kw in borrower_msgs[-1].content.lower() for kw in deal_keywords):
@@ -174,12 +197,14 @@ async def simulate_pipeline(
     conv2.outcome = "no_deal"
 
     # Handoff 2→3
+    logger.info("Handoff 2->3")
     handoff_2to3 = await summarize_for_handoff([conv1, conv2])
     if cost_tracker:
         cost_tracker.record("handoff_2to3", 500, handoff_2to3.token_count, settings.azure_openai_deployment_mini)
     result.handoff_summaries.append(handoff_2to3)
 
     # Stage 3: Final Notice
+    logger.info("Stage 3: Final Notice")
     final_agent = FinalNoticeAgent(system_prompt=final_notice_prompt)
     conv3 = await simulate_conversation(
         final_agent, persona, borrower,
@@ -189,6 +214,7 @@ async def simulate_pipeline(
     result.conversations.append(conv3)
 
     # Check final outcome
+    logger.info("Final outcome")
     borrower_msgs3 = [m for m in conv3.messages if m.role == "borrower"]
     resolve_keywords = ["accept", "agree", "i'll pay", "fine", "go ahead"]
     if borrower_msgs3 and any(kw in borrower_msgs3[-1].content.lower() for kw in resolve_keywords):

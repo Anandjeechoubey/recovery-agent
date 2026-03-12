@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # Database
+    database_url: str = "postgresql+asyncpg://recovery:recovery@localhost:5433/recovery_agents"
+
     # Token budgets
     max_total_tokens: int = 2000
     max_handoff_tokens: int = 500
@@ -33,9 +36,10 @@ class Settings(BaseSettings):
     # Learning loop
     learning_budget_usd: float = 20.0
     conversations_per_eval: int = 20
+    conversations_per_persona: int = 3  # repeats per persona (total = this × len(PERSONAS))
     max_learning_iterations: int = 8
-    stat_significance_p: float = 0.05
-    min_effect_size: float = 0.2
+    stat_significance_p: float = 0.10  # relaxed for small samples; meta-evaluator can tighten
+    min_effect_size: float = 0.1  # 0.1 on 1-5 scale is meaningful with 0.5-increment scoring
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

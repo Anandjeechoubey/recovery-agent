@@ -27,6 +27,7 @@ from src.learning.statistical import ComparisonResult, should_adopt, wilcoxon_co
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 DATA_DIR = Path("data")
 AGENT_TYPES = ["assessment", "resolution", "final_notice"]
@@ -83,7 +84,7 @@ async def run_learning_loop() -> None:
             if cost_tracker.budget_exceeded:
                 break
 
-            logger.info(f"\nOptimizing {agent_type}...")
+            logger.info(f"\n[ITERATION {iteration}] Optimizing {agent_type}...")
 
             # Analyze baseline scores for this agent
             agent_evals = baseline_results["per_agent_evals"].get(agent_type, [])
@@ -97,10 +98,12 @@ async def run_learning_loop() -> None:
                 continue
 
             weakest = min(agent_metrics, key=lambda m: m.value)
-            logger.info(f"  Weakest metric: {weakest.name} = {weakest.value:.2f}")
+            logger.info(f"[ITERATION {iteration}] Weakest metric: {weakest.name} = {weakest.value:.2f}")
 
-            # Get failure examples
-            failures = _get_failure_examples(baseline_results["pipeline_results"], agent_type, weakest.name)
+            # Get failure examples with eval data for better analysis
+            failures = _get_failure_examples(
+                baseline_results["pipeline_results"], agent_evals, agent_type, weakest.name,
+            )
 
             # Propose mutation
             score_summary = "\n".join(f"  {m.name}: {m.value:.2f}" for m in agent_metrics)
@@ -114,7 +117,7 @@ async def run_learning_loop() -> None:
                 max_tokens=settings.max_total_tokens if agent_type == "assessment" else settings.max_total_tokens - settings.max_handoff_tokens,
                 cost_tracker=cost_tracker,
             )
-            logger.info(f"  Proposed change: {description}")
+            logger.info(f"[ITERATION {iteration}] Proposed change: {description}")
 
             if new_prompt == current_prompts[agent_type]:
                 logger.info(f"  No change proposed, skipping")
@@ -131,6 +134,7 @@ async def run_learning_loop() -> None:
             candidate_results = await _run_evaluation_batch(
                 candidate_prompts, cost_tracker,
                 seed_offset=iteration * 1000 + 500,
+                run_type=f"{agent_type}_improvement"
             )
 
             # Statistical comparison
@@ -213,8 +217,8 @@ async def run_learning_loop() -> None:
                 else {}
             )
 
-        # --- META-EVALUATION (every 2 iterations) ---
-        if iteration % 2 == 0:
+        # --- META-EVALUATION (every iteration for faster feedback) ---
+        if True:
             logger.info("\nRunning meta-evaluation...")
             sample_convs = []
             for pr in baseline_results["pipeline_results"][:3]:
@@ -256,20 +260,25 @@ async def _run_evaluation_batch(
     prompts: dict[str, str],
     cost_tracker: CostTracker,
     seed_offset: int = 0,
+    run_type: str = 'baseline',
 ) -> dict:
-    """Run a batch of pipeline simulations and evaluate them."""
-    pipeline_results: list[PipelineResult] = []
-    per_agent_evals: dict[str, list[dict]] = {at: [] for at in AGENT_TYPES}
-    per_agent_violations: dict[str, list[list[dict]]] = {at: [] for at in AGENT_TYPES}
+    """Run a batch of pipeline simulations and evaluate them.
 
-    # 4 conversations per persona, 5 personas = 20 total
-    for persona_idx, persona in enumerate(PERSONAS):
-        for repeat in range(4):
+    Optimized: simulations run concurrently (bounded by semaphore),
+    then evaluations + compliance checks run concurrently per result.
+    """
+    # Semaphore limits concurrent API calls to avoid rate-limiting
+    sim_semaphore = asyncio.Semaphore(5)
+    eval_semaphore = asyncio.Semaphore(10)
+
+    # --- Phase 1: Run all pipeline simulations concurrently ---
+    async def _run_one_sim(persona, persona_idx, repeat):
+        async with sim_semaphore:
             if cost_tracker.budget_exceeded:
-                break
-
+                return None
             seed = seed_offset + persona_idx * 10 + repeat
-            result = await simulate_pipeline(
+            logger.info(f"[ITERATION {int(seed_offset/1000)}], [RUN TYPE: {run_type}], Persona: {persona_idx}. {persona.name}, Repeat: {repeat}")
+            return await simulate_pipeline(
                 persona,
                 assessment_prompt=prompts["assessment"],
                 resolution_prompt=prompts["resolution"],
@@ -277,19 +286,41 @@ async def _run_evaluation_batch(
                 cost_tracker=cost_tracker,
                 seed=seed,
             )
-            pipeline_results.append(result)
 
-            # Evaluate each conversation in the pipeline
+    sim_tasks = []
+    for persona_idx, persona in enumerate(PERSONAS):
+        for repeat in range(settings.conversations_per_persona):
+            sim_tasks.append(_run_one_sim(persona, persona_idx, repeat))
+
+    logger.info(f"Launching {len(sim_tasks)} pipeline simulations concurrently...")
+    sim_results = await asyncio.gather(*sim_tasks)
+    pipeline_results = [r for r in sim_results if r is not None]
+    logger.info(f"Completed {len(pipeline_results)} simulations.")
+
+    # --- Phase 2: Evaluate + compliance-check all results concurrently ---
+    async def _eval_one_pipeline(result: PipelineResult):
+        async with eval_semaphore:
             eval_scores = await evaluate_pipeline(result.conversations, cost_tracker)
 
-            for conv in result.conversations:
-                agent_type = conv.agent_type
-                if agent_type in eval_scores:
-                    per_agent_evals[agent_type].append(eval_scores[agent_type])
+            compliance_tasks = [evaluate_compliance([conv]) for conv in result.conversations]
+            compliance_results = await asyncio.gather(*compliance_tasks)
 
-                # Compliance check
-                rate, violations = await evaluate_compliance([conv])
-                per_agent_violations[agent_type].extend(violations)
+            return eval_scores, compliance_results
+
+    logger.info(f"Evaluating {len(pipeline_results)} pipeline results concurrently...")
+    eval_tasks = [_eval_one_pipeline(r) for r in pipeline_results]
+    eval_results = await asyncio.gather(*eval_tasks)
+
+    # --- Phase 3: Aggregate results ---
+    per_agent_evals: dict[str, list[dict]] = {at: [] for at in AGENT_TYPES}
+    per_agent_violations: dict[str, list[list[dict]]] = {at: [] for at in AGENT_TYPES}
+
+    for result, (eval_scores, compliance_results) in zip(pipeline_results, eval_results):
+        for conv, (_, violations) in zip(result.conversations, compliance_results):
+            agent_type = conv.agent_type
+            if agent_type in eval_scores:
+                per_agent_evals[agent_type].append(eval_scores[agent_type])
+            per_agent_violations[agent_type].extend(violations)
 
     # Compute compliance rates
     compliance_rates = {}
@@ -310,20 +341,37 @@ async def _run_evaluation_batch(
 
 def _get_failure_examples(
     pipeline_results: list[PipelineResult],
+    per_agent_evals: list[dict],
     agent_type: str,
     metric_name: str,
 ) -> list[str]:
-    """Extract failure examples for a given agent and metric."""
-    examples = []
-    for pr in pipeline_results[:5]:
+    """Extract failure examples sorted by worst metric score, with evaluator reasoning."""
+    # Pair each conversation with its eval score for the target metric
+    scored_examples = []
+    for i, pr in enumerate(pipeline_results):
         for conv in pr.conversations:
             if conv.agent_type == agent_type:
-                # Get last few messages as context
-                last_msgs = conv.messages[-4:]
-                snippet = " | ".join(f"{m.role}: {m.content[:80]}" for m in last_msgs)
-                examples.append(snippet)
+                # Get the eval score for this conversation if available
+                score = 5.0  # default high (will sort to bottom)
+                reasoning = ""
+                if i < len(per_agent_evals):
+                    eval_data = per_agent_evals[i]
+                    metric_data = eval_data.get(metric_name, {})
+                    if isinstance(metric_data, dict):
+                        score = metric_data.get("score", 5.0)
+                        reasoning = metric_data.get("reasoning", "")
+
+                # Build a rich snippet
+                last_msgs = conv.messages[-6:]
+                snippet = " | ".join(f"{m.role}: {m.content[:100]}" for m in last_msgs)
+                if reasoning:
+                    snippet = f"[Score: {score}, Reason: {reasoning}] {snippet}"
+                scored_examples.append((score, snippet))
                 break
-    return examples[:3]
+
+    # Sort by score ascending (worst first) and return top 5
+    scored_examples.sort(key=lambda x: x[0])
+    return [snippet for _, snippet in scored_examples[:5]]
 
 
 def _save_iteration_data(iteration: int, data: dict) -> None:

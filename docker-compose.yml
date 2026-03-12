@@ -12,6 +12,22 @@ services:
       timeout: 5s
       retries: 10
 
+  appdb:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: recovery
+      POSTGRES_USER: recovery
+      POSTGRES_DB: recovery_agents
+    volumes:
+      - appdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recovery -d recovery_agents"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   temporal:
     image: temporalio/auto-setup:latest
     depends_on:
@@ -42,7 +58,7 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:8080
 
-  api:
+  app:
     build: .
     command: python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
     ports:
@@ -50,27 +66,19 @@ services:
     depends_on:
       temporal:
         condition: service_healthy
-    env_file: .env
-    environment:
-      - TEMPORAL_HOST=temporal:7233
-    volumes:
-      - .:/app
-      - ./data:/app/data
-      - ./prompts:/app/prompts
-
-  worker:
-    build: .
-    command: python -m src.workflow.worker
-    depends_on:
-      temporal:
+      appdb:
         condition: service_healthy
     env_file: .env
     environment:
       - TEMPORAL_HOST=temporal:7233
+      - DATABASE_URL=postgresql+asyncpg://recovery:recovery@appdb:5432/recovery_agents
+      - PYTHONUNBUFFERED=1
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./frontend/dist:/app/frontend/dist
       - ./data:/app/data
       - ./prompts:/app/prompts
 
 volumes:
   pgdata:
+  appdata:

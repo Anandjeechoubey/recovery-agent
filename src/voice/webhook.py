@@ -60,6 +60,7 @@ async def vapi_webhook(request: Request):
         if workflow_id:
             # Signal the conversation manager that the call is done
             manager = get_manager(workflow_id)
+            logger.info(f"Sending trascript fwd, Size:{len(transcript)}. {transcript[:100]}")
             manager.receive_message(f"[CALL_ENDED] Transcript: {transcript}")
 
     elif event_type == "transcript":

@@ -32,11 +32,11 @@ class VapiClient:
             "customer": {"number": phone_number},
             "assistant": {
                 "model": {
-                    "provider": "azure-openai",
-                    "model": settings.azure_openai_deployment,
+                    "provider": "openai",
+                    "model": "gpt-4o",
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                    ],
+                    ]
                 },
                 "firstMessage": first_message,
                 "serverUrl": self.webhook_url,

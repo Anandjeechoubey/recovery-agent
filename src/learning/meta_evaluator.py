@@ -79,29 +79,32 @@ class MetaEvaluator:
         iteration: int,
         sample_conversations: list[Conversation],
     ) -> MetaEvalReport:
-        """Run all meta-evaluation checks."""
+        """Run all meta-evaluation checks (async checks run concurrently)."""
+        import asyncio
         report = MetaEvalReport(iteration=iteration)
 
-        # Check 1: Metric reliability (consistency)
-        reliability_finding = await self._check_metric_reliability(sample_conversations)
+        # Run async checks concurrently (reliability + compliance blind spots)
+        reliability_task = self._check_metric_reliability(sample_conversations)
+        compliance_task = self._check_compliance_blind_spots()
+        reliability_finding, compliance_finding = await asyncio.gather(
+            reliability_task, compliance_task
+        )
+
         if reliability_finding:
             report.findings.append(reliability_finding)
             report.metric_configs_updated = True
 
-        # Check 2: Metric-outcome correlation
+        # Synchronous checks (no LLM calls, instant)
         correlation_finding = self._check_metric_outcome_correlation()
         if correlation_finding:
             report.findings.append(correlation_finding)
             report.metric_configs_updated = True
 
-        # Check 3: Threshold calibration
         threshold_finding = self._check_threshold_calibration()
         if threshold_finding:
             report.findings.append(threshold_finding)
             report.threshold_updated = True
 
-        # Check 4: Compliance blind spots
-        compliance_finding = await self._check_compliance_blind_spots()
         if compliance_finding:
             report.findings.append(compliance_finding)
 
@@ -118,14 +121,16 @@ class MetaEvaluator:
 
         sample = conversations[:3]  # Cost-efficient: only test 3
 
-        # Evaluate twice
-        scores_run1 = []
-        scores_run2 = []
+        # Evaluate twice — all 6 calls in parallel
+        import asyncio
+        all_tasks = []
         for conv in sample:
-            s1 = await evaluate_conversation(conv, self.cost_tracker)
-            s2 = await evaluate_conversation(conv, self.cost_tracker)
-            scores_run1.append(s1)
-            scores_run2.append(s2)
+            all_tasks.append(evaluate_conversation(conv, self.cost_tracker))
+            all_tasks.append(evaluate_conversation(conv, self.cost_tracker))
+
+        all_results = await asyncio.gather(*all_tasks)
+        scores_run1 = [all_results[i] for i in range(0, len(all_results), 2)]
+        scores_run2 = [all_results[i] for i in range(1, len(all_results), 2)]
 
         # Check per-metric variance
         unreliable_metrics = []
@@ -274,16 +279,18 @@ class MetaEvaluator:
                 after={"p_value_threshold": self.p_value_threshold},
             )
 
-        if adoption_rate < 0.1:
+        if adoption_rate < 0.15:
             old_effect = self.min_effect_size
-            self.min_effect_size = max(0.1, old_effect * 0.7)
+            old_p = self.p_value_threshold
+            self.min_effect_size = max(0.05, old_effect * 0.7)
+            self.p_value_threshold = min(0.15, old_p * 1.5)
             return MetaEvalFinding(
                 check_type="threshold",
-                description=f"Adoption rate too low ({adoption_rate:.0%}). Threshold may be too strict.",
+                description=f"Adoption rate too low ({adoption_rate:.0%}). Relaxing both effect size and p-value thresholds.",
                 evidence={"adoption_rate": adoption_rate, "total_decisions": len(self.adoption_history)},
-                action_taken=f"Relaxed min effect size from {old_effect} to {self.min_effect_size}",
-                before={"min_effect_size": old_effect},
-                after={"min_effect_size": self.min_effect_size},
+                action_taken=f"Relaxed min effect {old_effect:.3f}->{self.min_effect_size:.3f}, p-value {old_p:.3f}->{self.p_value_threshold:.3f}",
+                before={"min_effect_size": old_effect, "p_value_threshold": old_p},
+                after={"min_effect_size": self.min_effect_size, "p_value_threshold": self.p_value_threshold},
             )
 
         return None

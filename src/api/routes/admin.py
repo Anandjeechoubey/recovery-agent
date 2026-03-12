@@ -17,6 +17,7 @@ async def list_prompts(agent_type: str):
             "is_active": v.is_active,
             "token_count": v.token_count,
             "created_at": v.created_at.isoformat(),
+            "content": v.content,
         }
         for v in versions
     ]

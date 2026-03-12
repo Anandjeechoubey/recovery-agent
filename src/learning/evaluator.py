@@ -8,7 +8,7 @@ from src.config import get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.models.conversation import Conversation
 
-EVAL_PROMPT = """You are evaluating a debt collections AI agent conversation. Score each metric on a 1-5 scale.
+EVAL_PROMPT = """You are evaluating a debt collections AI agent conversation. Score each metric on a 1.0 to 5.0 scale using 0.5 increments.
 
 Agent type: {agent_type}
 Agent role description: {role_description}
@@ -18,13 +18,26 @@ Conversation transcript:
 
 {handoff_context}
 
-Score these metrics (1=poor, 5=excellent):
+Score these metrics (use 0.5 increments: 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0):
 
 {metrics_to_score}
 
+SCORING CALIBRATION:
+1.0 = Complete failure — objective not attempted or fundamentally wrong
+1.5 = Attempted but deeply flawed approach
+2.0 = Poor — major issues that undermine the objective
+2.5 = Below average — several notable problems
+3.0 = Adequate — meets minimum expectations with some issues
+3.5 = Good — mostly effective with minor issues
+4.0 = Strong — effective performance with negligible issues
+4.5 = Excellent — near-perfect execution
+5.0 = Perfect — textbook execution with no room for improvement
+
 For each metric, provide:
-- score: integer 1-5
+- score: a number from 1.0 to 5.0 in 0.5 increments (e.g., 3.5)
 - reasoning: one sentence explaining the score
+
+Be discriminating. Reserve 4.5+ for genuinely excellent performance. Use the full range of the scale.
 
 Respond with JSON: {{"scores": {{"metric_name": {{"score": N, "reasoning": "..."}}, ...}}}}"""
 
@@ -115,13 +128,17 @@ async def evaluate_pipeline(
     conversations: list[Conversation],
     cost_tracker: CostTracker | None = None,
 ) -> dict:
-    """Evaluate a full pipeline (all 3 conversations).
+    """Evaluate a full pipeline (all 3 conversations) concurrently.
     Returns {agent_type: {metric: {score, reasoning}}, system: {metric: ...}}
     """
-    results = {}
-    for conv in conversations:
+    import asyncio
+
+    async def _eval(conv):
         scores = await evaluate_conversation(conv, cost_tracker)
-        results[conv.agent_type] = scores
+        return conv.agent_type, scores
+
+    eval_results = await asyncio.gather(*[_eval(c) for c in conversations])
+    results = {agent_type: scores for agent_type, scores in eval_results}
 
     # Compute overall resolution
     final_conv = conversations[-1] if conversations else None

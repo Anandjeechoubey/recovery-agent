@@ -5,7 +5,21 @@
       "WebSearch",
       "WebFetch(domain:docs.vapi.ai)",
       "Bash(pip install:*)",
-      "Bash(python -m pytest tests/ -v)"
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/loop.py''\\).read\\(\\)\\); print\\(''loop.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/evaluator.py''\\).read\\(\\)\\); print\\(''evaluator.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/meta_evaluator.py''\\).read\\(\\)\\); print\\(''meta_evaluator.py OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/config.py''\\).read\\(\\)\\); print\\(''config.py OK''\\)\")",
+      "Bash(find /Users/anandjeechoubey/pilots/recovery-agents/data -type f -name \"*.json\" -exec wc -l {} +)",
+      "Bash(wc -l /Users/anandjeechoubey/pilots/recovery-agents/src/learning/*.py)",
+      "Bash(grep -n \"TODO\\\\|FIXME\\\\|BUG\\\\|XXX\\\\|ISSUE\" /Users/anandjeechoubey/pilots/recovery-agents/src/learning/*.py)",
+      "Bash(python -c \":*)",
+      "Bash(find /Users/anandjeechoubey/pilots/recovery-agents -type f \\\\\\(-name *sql -o -name *database* -o -name *db* -o -name alembic.ini -o -name migrations \\\\\\))",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /Users/anandjeechoubey/pilots/recovery-agents/src --include=*.py)"
     ]
   }
 }

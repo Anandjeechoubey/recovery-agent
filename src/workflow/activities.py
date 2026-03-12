@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional
 
 from temporalio import activity
@@ -9,9 +11,14 @@ from temporalio import activity
 from src.agents.assessment import AssessmentAgent
 from src.agents.final_notice import FinalNoticeAgent
 from src.agents.resolution import ResolutionAgent
+from src.config import settings
 from src.context.summarizer import summarize_for_handoff
+from src.db import repo
 from src.models.borrower import Borrower
 from src.models.conversation import Conversation, HandoffSummary, Message
+from src.voice.vapi_client import VapiClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,12 +40,19 @@ class StageResult:
 
 
 class ConversationManager:
-    """Manages real-time chat conversations via signals."""
+    """Manages real-time chat conversations via signals and tracks messages for SSE."""
 
     def __init__(self):
         self.pending_messages: asyncio.Queue[str] = asyncio.Queue()
         self.response_ready: asyncio.Event = asyncio.Event()
         self.latest_response: str = ""
+        # Tracked messages for SSE streaming
+        self.messages: list[dict] = []
+        self.new_message_event: asyncio.Event = asyncio.Event()
+        self.current_stage: str = "pending"
+        self.outcome: str = "pending"
+        # DB conversation id for the current stage
+        self._db_conversation_id: int | None = None
 
     async def wait_for_message(self, timeout: float = 300.0) -> str | None:
         try:
@@ -48,6 +62,72 @@ class ConversationManager:
 
     def receive_message(self, message: str) -> None:
         self.pending_messages.put_nowait(message)
+
+    async def add_tracked_message(self, role: str, content: str, stage: str) -> None:
+        """Track a message for SSE delivery and persist to database."""
+        self.messages.append({
+            "role": role,
+            "content": content,
+            "stage": stage,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        self.new_message_event.set()
+
+        # Persist to DB (fire-and-forget style, don't block on failure)
+        if self._db_conversation_id is not None:
+            try:
+                await repo.add_message(
+                    self._db_conversation_id, role, content, stage,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to persist message to DB: {e}")
+
+    async def set_stage(self, stage: str) -> None:
+        """Update current stage and notify SSE consumers."""
+        prev = self.current_stage
+        self.current_stage = stage
+        if prev != stage:
+            self.messages.append({
+                "role": "system",
+                "content": f"stage_change:{stage}",
+                "stage": stage,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            self.new_message_event.set()
+
+    def set_outcome(self, outcome: str) -> None:
+        self.outcome = outcome
+        self.messages.append({
+            "role": "system",
+            "content": f"outcome:{outcome}",
+            "stage": self.current_stage,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        self.new_message_event.set()
+
+    async def start_db_conversation(
+        self, workflow_id: str, borrower_id: str, agent_type: str,
+    ) -> None:
+        """Create a DB conversation row for the current stage."""
+        try:
+            self._db_conversation_id = await repo.create_conversation(
+                workflow_id=workflow_id,
+                borrower_id=borrower_id,
+                agent_type=agent_type,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to create DB conversation: {e}")
+            self._db_conversation_id = None
+
+    async def end_db_conversation(self, outcome: str) -> None:
+        """Update the DB conversation outcome."""
+        if self._db_conversation_id is not None:
+            try:
+                await repo.update_conversation_outcome(
+                    self._db_conversation_id, outcome,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update DB conversation outcome: {e}")
 
 
 # Global conversation managers keyed by workflow_id
@@ -73,9 +153,12 @@ async def run_assessment(
     agent = AssessmentAgent()
     conversation = Conversation(borrower_id=borrower.id, agent_type="assessment")
     manager = get_manager(workflow_id)
+    await manager.set_stage("assessment")
+    await manager.start_db_conversation(workflow_id, borrower.id, "assessment")
 
     # Agent opens
     opening = await agent.generate_opening(conversation, borrower)
+    await manager.add_tracked_message("agent", opening.content, "assessment")
     activity.logger.info(f"Assessment opening: {opening.content[:100]}")
 
     # Conversation loop
@@ -92,12 +175,15 @@ async def run_assessment(
                 conversation.outcome = "no_response"
                 break
             follow_up = await agent.respond(conversation, borrower)
+            await manager.add_tracked_message("agent", follow_up.content, "assessment")
             activity.logger.info(f"Assessment follow-up: {follow_up.content[:100]}")
             continue
 
         no_response_count = 0
         conversation.add_message("borrower", borrower_msg)
+        await manager.add_tracked_message("borrower", borrower_msg, "assessment")
         response = await agent.respond(conversation, borrower)
+        await manager.add_tracked_message("agent", response.content, "assessment")
         activity.logger.info(f"Assessment response: {response.content[:100]}")
 
         # Check if assessment is complete (agent gathered enough info)
@@ -107,6 +193,7 @@ async def run_assessment(
     else:
         conversation.outcome = "assessed"
 
+    await manager.end_db_conversation(conversation.outcome)
     return StageResult(
         agent_type="assessment",
         outcome=conversation.outcome,
@@ -129,10 +216,126 @@ async def run_resolution(
         handoff_summary=handoff,
     )
     manager = get_manager(workflow_id)
+    await manager.set_stage("resolution")
+    await manager.start_db_conversation(workflow_id, borrower.id, "resolution")
 
-    # Agent opens (voice call simulation or live)
+    print(f"[RESOLUTION] Starting for {workflow_id}, voice_mode={settings.voice_mode}, phone={borrower.phone_number}")
+
+    # Build system prompt with handoff context for the voice call
     opening = await agent.generate_opening(conversation, borrower, handoff)
-    activity.logger.info(f"Resolution opening: {opening.content[:100]}")
+    first_message = opening.content
+    system_prompt = agent.system_prompt
+    if handoff:
+        system_prompt += f"\n\n## PRIOR CONTEXT\n{handoff.content}"
+
+    print(f"[RESOLUTION] Opening generated, checking voice mode: voice_mode='{settings.voice_mode}', has_phone={bool(borrower.phone_number)}")
+
+    if settings.voice_mode == "live" and borrower.phone_number:
+        # --- LIVE VOICE CALL via Vapi ---
+        print(f"[RESOLUTION] Initiating Vapi call to {borrower.phone_number}")
+        await manager.add_tracked_message(
+            "agent",
+            f"Initiating phone call to {borrower.phone_number}...",
+            "resolution",
+        )
+
+        vapi = VapiClient()
+        try:
+            print(f"[RESOLUTION] Calling Vapi API: phone={borrower.phone_number}, phone_number_id={vapi.phone_number_id}, webhook={vapi.webhook_url}")
+            call_id = await vapi.create_outbound_call(
+                phone_number=borrower.phone_number,
+                system_prompt=system_prompt,
+                first_message=first_message,
+                metadata={"workflow_id": workflow_id},
+            )
+            print(f"[RESOLUTION] Vapi call created successfully: {call_id}")
+            await manager.add_tracked_message(
+                "agent",
+                f"Call initiated (ID: {call_id}). Ringing your phone...",
+                "resolution",
+            )
+        except Exception as e:
+            print(f"[RESOLUTION] ERROR: Failed to create Vapi call: {e}")
+            import traceback
+            traceback.print_exc()
+            await manager.add_tracked_message(
+                "agent", f"Call failed: {e}. Falling back to chat.", "resolution"
+            )
+            # Fall through to simulated chat below
+            return await _run_resolution_chat(
+                agent, borrower, handoff, conversation, manager, workflow_id
+            )
+
+        # Wait for the call to end — webhook sends [CALL_ENDED] via manager
+        # Poll with heartbeats so Temporal doesn't time out the activity
+        call_ended = False
+        transcript_text = ""
+        max_wait = 600  # 10 minutes max
+        waited = 0
+
+        while waited < max_wait:
+            activity.heartbeat()
+            msg = await manager.wait_for_message(timeout=30.0)
+            if msg is None:
+                waited += 30
+                continue
+
+            if msg.startswith("[CALL_ENDED]"):
+                call_ended = True
+                transcript_text = msg.replace("[CALL_ENDED] Transcript: ", "")
+
+                break
+            else:
+                # Real-time transcript snippets from webhook
+                conversation.add_message("borrower", msg)
+                await manager.add_tracked_message("borrower", msg, "resolution")
+                waited = 0  # Reset timeout while call is active
+
+        logger.info(f"call_ended: {call_ended}, transcript_text: {transcript_text[:100]}")
+
+        if call_ended and transcript_text:
+            await manager.add_tracked_message("agent", "Phone call completed.", "resolution")
+            conversation.add_message("system", f"Call transcript: {transcript_text}")
+            # Determine outcome from transcript
+            if await _transcript_has_agreement(transcript_text):
+                conversation.outcome = "deal_agreed"
+            else:
+                conversation.outcome = "no_deal"
+        else:
+            await manager.add_tracked_message(
+                "agent", "Call timed out or was not completed.", "resolution"
+            )
+            conversation.outcome = "no_deal"
+
+    else:
+        # --- SIMULATED MODE: run as chat ---
+        return await _run_resolution_chat(
+            agent, borrower, handoff, conversation, manager, workflow_id
+        )
+
+    await manager.end_db_conversation(conversation.outcome)
+    return StageResult(
+        agent_type="resolution",
+        outcome=conversation.outcome,
+        conversation=conversation,
+    ).to_dict()
+
+
+async def _run_resolution_chat(
+    agent: ResolutionAgent,
+    borrower: Borrower,
+    handoff: HandoffSummary | None,
+    conversation: Conversation,
+    manager: ConversationManager,
+    workflow_id: str,
+) -> dict:
+    """Run resolution as simulated text chat (fallback or simulated mode)."""
+    opening = conversation.messages[-1] if conversation.messages else None
+    if not opening:
+        opening_msg = await agent.generate_opening(conversation, borrower, handoff)
+        await manager.add_tracked_message("agent", opening_msg.content, "resolution")
+    else:
+        await manager.add_tracked_message("agent", opening.content, "resolution")
 
     max_turns = 10
     for _ in range(max_turns):
@@ -144,10 +347,11 @@ async def run_resolution(
             break
 
         conversation.add_message("borrower", borrower_msg)
+        await manager.add_tracked_message("borrower", borrower_msg, "resolution")
         response = await agent.respond(conversation, borrower, handoff)
+        await manager.add_tracked_message("agent", response.content, "resolution")
         activity.logger.info(f"Resolution response: {response.content[:100]}")
 
-        # Check for deal
         if _deal_agreed(conversation):
             conversation.outcome = "deal_agreed"
             break
@@ -157,6 +361,7 @@ async def run_resolution(
     if conversation.outcome == "":
         conversation.outcome = "no_deal"
 
+    await manager.end_db_conversation(conversation.outcome)
     return StageResult(
         agent_type="resolution",
         outcome=conversation.outcome,
@@ -179,8 +384,11 @@ async def run_final_notice(
         handoff_summary=handoff,
     )
     manager = get_manager(workflow_id)
+    await manager.set_stage("final_notice")
+    await manager.start_db_conversation(workflow_id, borrower.id, "final_notice")
 
     opening = await agent.generate_opening(conversation, borrower, handoff)
+    await manager.add_tracked_message("agent", opening.content, "final_notice")
     activity.logger.info(f"Final notice opening: {opening.content[:100]}")
 
     max_turns = 8
@@ -193,7 +401,9 @@ async def run_final_notice(
             break
 
         conversation.add_message("borrower", borrower_msg)
+        await manager.add_tracked_message("borrower", borrower_msg, "final_notice")
         response = await agent.respond(conversation, borrower, handoff)
+        await manager.add_tracked_message("agent", response.content, "final_notice")
         activity.logger.info(f"Final notice response: {response.content[:100]}")
 
         if _resolved(conversation):
@@ -205,6 +415,7 @@ async def run_final_notice(
     if conversation.outcome == "" or conversation.outcome == "in_progress":
         conversation.outcome = "no_resolution"
 
+    await manager.end_db_conversation(conversation.outcome)
     return StageResult(
         agent_type="final_notice",
         outcome=conversation.outcome,
@@ -262,6 +473,44 @@ def _deal_agreed(conversation: Conversation) -> bool:
         "deal", "ok i'll do", "fine i'll", "yes", "go ahead",
         "i can do that", "set it up", "sign me up",
     ])
+
+
+async def _transcript_has_agreement(transcript: str) -> bool:
+    """Use LLM-as-judge to determine if the borrower agreed to a deal in the transcript."""
+    from src.config import get_openai_client, settings
+
+    prompt = f"""You are reviewing a debt collections voice call transcript.
+
+Transcript:
+{transcript}
+
+Did the borrower clearly agree to pay or accept a settlement offer during this call?
+
+Consider agreement signals like: "yes", "okay", "I can do that", "yeah", "go ahead", "that works",
+"I'll do it", "sounds good", or any confirmation that the agent then acknowledged.
+Also consider context — if the agent confirmed a deal and the borrower did not object, that may indicate agreement.
+
+Respond with JSON only: {{"agreed": true}} or {{"agreed": false}}"""
+
+    try:
+        client = get_openai_client()
+        response = await client.chat.completions.create(
+            model=settings.azure_openai_deployment_mini,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=20,
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        import json
+        result = json.loads(response.choices[0].message.content or "{}")
+        return bool(result.get("agreed", False))
+    except Exception as e:
+        logger.warning(f"LLM agreement check failed, falling back to keyword match: {e}")
+        lower = transcript.lower()
+        return any(kw in lower for kw in [
+            "i agree", "i accept", "i'll pay", "yes", "go ahead",
+            "sounds good", "that works", "i can do that", "deal",
+        ])
 
 
 def _resolved(conversation: Conversation) -> bool:
