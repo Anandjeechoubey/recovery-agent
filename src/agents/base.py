@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from langfuse import observe
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.context.token_budget import count_tokens, enforce_budget
 from src.models.borrower import Borrower
 from src.models.conversation import Conversation, HandoffSummary, Message
@@ -70,7 +70,8 @@ class BaseAgent:
     ) -> Message:
         messages = self.build_messages(conversation, borrower, handoff)
 
-        response = await self.client.chat.completions.create(
+        response = await call_openai_with_retry(
+            self.client,
             model=settings.azure_openai_deployment,
             messages=messages,
             max_tokens=300,

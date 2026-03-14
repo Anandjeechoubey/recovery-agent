@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from langfuse import observe
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.learning.evaluator import evaluate_conversation
 from src.learning.metrics import DEFAULT_METRIC_CONFIGS, MetricConfig
@@ -305,7 +305,8 @@ class MetaEvaluator:
         client = get_openai_client()
 
         # Ask LLM to generate borderline compliance violations
-        response = await client.chat.completions.create(
+        response = await call_openai_with_retry(
+            client,
             model=settings.azure_openai_deployment_mini,
             messages=[{
                 "role": "user",

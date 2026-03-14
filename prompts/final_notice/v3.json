@@ -49,6 +49,6 @@
     "reason": "Significant improvement: no_repeated_questions: +0.33 (p=0.0625)",
     "change_description": "Enhanced phrasing in context integration and financial concern handling sections to improve context_usage metric by ensuring smoother incorporation of borrower concerns into responses. Minor adjustments were made to improve clarity and flow without significantly altering overall length."
   },
-  "is_active": true,
+  "is_active": false,
   "parent_version_id": "15a42066"
 }

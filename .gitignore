@@ -7,9 +7,6 @@ build/
 .env
 .venv/
 venv/
-data/conversations/*
-data/evaluations/*
-data/reports/*
 !data/**/.gitkeep
 .mypy_cache/
 .pytest_cache/

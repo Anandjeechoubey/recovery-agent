@@ -6,7 +6,7 @@ import json
 
 from langfuse import observe
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.models.conversation import Conversation
 
@@ -104,7 +104,8 @@ async def evaluate_conversation(
     )
 
     client = get_openai_client()
-    response = await client.chat.completions.create(
+    response = await call_openai_with_retry(
+        client,
         model=settings.azure_openai_deployment_mini,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=500,

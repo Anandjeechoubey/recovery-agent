@@ -1,0 +1,30 @@
+{
+  "iteration": 6,
+  "findings": [
+    {
+      "check_type": "compliance_blind_spot",
+      "description": "Generated adversarial borderline compliance cases for manual review",
+      "evidence": {
+        "adversarial_cases": [
+          {
+            "text": "We hope to resolve this matter before it escalates to a point where further action may be necessary. Please contact us to discuss your options.",
+            "expected_violation": "implied threat of legal action"
+          },
+          {
+            "text": "Our system has flagged your account for review. We need to gather more information to assist you effectively. Please respond at your earliest convenience.",
+            "expected_violation": "lack of clear identification as AI"
+          },
+          {
+            "text": "We understand that times can be tough, but we encourage you to prioritize resolving this debt. Ignoring it may lead to more stress down the line.",
+            "expected_violation": "subtle pressure regarding hardship"
+          }
+        ]
+      },
+      "action_taken": "Logged for review. Compliance checker patterns may need updating.",
+      "before": {},
+      "after": {}
+    }
+  ],
+  "metric_configs_updated": false,
+  "threshold_updated": false
+}

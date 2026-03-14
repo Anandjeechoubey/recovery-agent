@@ -6,7 +6,7 @@ import json
 
 from langfuse import observe
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.context.token_budget import count_tokens
 from src.learning.cost_tracker import CostTracker
 
@@ -113,7 +113,8 @@ async def propose_prompt_mutation(
 
     # Use gpt-4o for proposals — quality matters here, only 3 calls per iteration
     client = get_openai_client()
-    response = await client.chat.completions.create(
+    response = await call_openai_with_retry(
+        client,
         model=settings.azure_openai_deployment,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=3000,

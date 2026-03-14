@@ -35,6 +35,6 @@
     "reason": "Significant improvement: efficiency: +0.20 (p=0.0781)",
     "change_description": "New sections were added to target the weakest metric, efficiency, by including specific guidance on avoiding unnecessary back-and-forth and how to manage borrower emotional responses concisely. The additions aim to streamline conversations without compromising compliance, professionalism, or information-gathering depth."
   },
-  "is_active": true,
+  "is_active": false,
   "parent_version_id": "c1e76281"
 }

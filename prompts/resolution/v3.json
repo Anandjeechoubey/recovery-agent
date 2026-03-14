@@ -49,6 +49,6 @@
     "reason": "Significant improvement: context_usage: +0.40 (p=0.0020); no_repeated_questions: +0.20 (p=0.0859)",
     "change_description": "Refined objection handling and added a stronger push for commitment by addressing borrower concerns more directly. This improves negotiation effectiveness without increasing token usage significantly."
   },
-  "is_active": true,
+  "is_active": false,
   "parent_version_id": "0742817e"
 }

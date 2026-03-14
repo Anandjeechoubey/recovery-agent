@@ -5,6 +5,7 @@ import ProtectedRoute from "./components/shared/ProtectedRoute";
 import AdminPage from "./pages/AdminPage";
 import BorrowerPage from "./pages/BorrowerPage";
 import LandingPage from "./pages/LandingPage";
+import LearningLoopPage from "./pages/LearningLoopPage";
 import LoginPage from "./pages/LoginPage";
 
 export default function App() {
@@ -20,6 +21,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <AdminPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learning"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <LearningLoopPage />
                 </Layout>
               </ProtectedRoute>
             }

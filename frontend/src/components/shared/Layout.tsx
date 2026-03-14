@@ -13,6 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { path: "/admin", label: "Admin Dashboard" },
+    { path: "/learning", label: "Learning Loop" },
     { path: "/borrower", label: "Borrower Portal" },
   ];
 

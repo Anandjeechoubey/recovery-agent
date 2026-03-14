@@ -12,7 +12,7 @@ from starlette.responses import FileResponse
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.api.routes import admin, chat, workflow
+from src.api.routes import admin, chat, learning, workflow
 from src.api.routes import auth as auth_route
 from src.api.routes import sse as sse_route
 from src.config import settings
@@ -93,6 +93,7 @@ app.include_router(workflow.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(sse_route.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(learning.router, prefix="/api")
 app.include_router(vapi_router, prefix="/api")
 app.include_router(vapi_router)  # Also register at root for Vapi webhook callbacks
 

@@ -1,6 +1,6 @@
 from langfuse import observe
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.context.token_budget import count_tokens, truncate_to_tokens
 from src.models.conversation import Conversation, HandoffSummary
 
@@ -36,7 +36,8 @@ async def summarize_for_handoff(
     prompt = SUMMARIZE_PROMPT.format(transcript=transcript)
 
     client = get_openai_client()
-    response = await client.chat.completions.create(
+    response = await call_openai_with_retry(
+        client,
         model=settings.azure_openai_deployment_mini,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,

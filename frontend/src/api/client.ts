@@ -1,6 +1,9 @@
 import type {
   ActivePrompt,
   BorrowerWorkflow,
+  EvolutionReport,
+  IterationDetail,
+  IterationSummary,
   PromptVersion,
   StartWorkflowRequest,
   WorkflowStatus,
@@ -73,3 +76,16 @@ export const rollbackPrompt = (agentType: string, versionId: string) =>
   request<{ status: string }>(`/admin/prompts/${agentType}/rollback/${versionId}`, {
     method: "POST",
   });
+
+// Learning loop
+export const getEvolutionReport = () =>
+  request<EvolutionReport>("/learning/evolution");
+
+export const listIterations = () =>
+  request<IterationSummary[]>("/learning/iterations");
+
+export const getIteration = (num: number) =>
+  request<IterationDetail>(`/learning/iterations/${num}`);
+
+export const getCostReport = () =>
+  request<Record<string, unknown>>("/learning/cost");

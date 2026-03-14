@@ -12,7 +12,7 @@ from src.agents.assessment import AssessmentAgent
 from src.agents.base import BaseAgent
 from src.agents.final_notice import FinalNoticeAgent
 from src.agents.resolution import ResolutionAgent
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.context.summarizer import summarize_for_handoff
 from src.learning.cost_tracker import CostTracker
 from src.learning.personas import BorrowerPersona
@@ -105,7 +105,7 @@ async def simulate_conversation(
             kwargs["seed"] = seed + turn
 
         try:
-            borrower_response = await client.chat.completions.create(**kwargs)
+            borrower_response = await call_openai_with_retry(client, **kwargs)
             borrower_text = borrower_response.choices[0].message.content or ""
         except openai.BadRequestError as e:
             if "content_filter" in str(e):
@@ -172,7 +172,6 @@ async def simulate_pipeline(
     result.conversations.append(conv1)
 
     # Handoff 1→2
-    logger.info("Handoff 1→2")
     handoff_1to2 = await summarize_for_handoff([conv1])
     if cost_tracker:
         cost_tracker.record("handoff_1to2", 300, handoff_1to2.token_count, settings.azure_openai_deployment_mini)
@@ -200,7 +199,6 @@ async def simulate_pipeline(
     conv2.outcome = "no_deal"
 
     # Handoff 2→3
-    logger.info("Handoff 2->3")
     handoff_2to3 = await summarize_for_handoff([conv1, conv2])
     if cost_tracker:
         cost_tracker.record("handoff_2to3", 500, handoff_2to3.token_count, settings.azure_openai_deployment_mini)

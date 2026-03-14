@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
+import openai
 from langfuse.openai import AsyncAzureOpenAI
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -59,3 +65,23 @@ def get_openai_client() -> AsyncAzureOpenAI:
         api_key=settings.azure_openai_api_key,
         api_version=settings.azure_openai_api_version,
     )
+
+
+RATE_LIMIT_WAIT_SECONDS = 5
+RATE_LIMIT_MAX_RETRIES = 5
+
+
+async def call_openai_with_retry(client: AsyncAzureOpenAI, **kwargs):
+    """Call chat.completions.create with automatic retry on rate limit (429).
+
+    Waits RATE_LIMIT_WAIT_SECONDS between retries, up to RATE_LIMIT_MAX_RETRIES attempts.
+    """
+    for attempt in range(1, RATE_LIMIT_MAX_RETRIES + 1):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except openai.RateLimitError:
+            if attempt == RATE_LIMIT_MAX_RETRIES:
+                logger.error(f"Rate limit: max retries ({RATE_LIMIT_MAX_RETRIES}) exhausted, raising")
+                raise
+            logger.warning(f"Rate limit hit, waiting {RATE_LIMIT_WAIT_SECONDS}s (attempt {attempt}/{RATE_LIMIT_MAX_RETRIES})...")
+            await asyncio.sleep(RATE_LIMIT_WAIT_SECONDS)

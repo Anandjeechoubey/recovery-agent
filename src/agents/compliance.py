@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from src.config import get_openai_client, settings
+from src.config import call_openai_with_retry, get_openai_client, settings
 from src.models.conversation import Conversation
 
 
@@ -131,7 +131,8 @@ async def check_compliance(conversation: Conversation) -> list[ComplianceViolati
     # Rules 2, 4, 7: LLM-assisted checks for false threats, misleading terms, professionalism
     client = get_openai_client()
     for i, msg in agent_messages:
-        response = await client.chat.completions.create(
+        response = await call_openai_with_retry(
+            client,
             model=settings.azure_openai_deployment_mini,
             messages=[
                 {"role": "user", "content": LLM_COMPLIANCE_PROMPT.format(message=msg.content)},

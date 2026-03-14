@@ -1,0 +1,47 @@
+{
+  "iteration": 2,
+  "findings": [
+    {
+      "check_type": "threshold",
+      "description": "Adoption rate too low (0%). Relaxing both effect size and p-value thresholds.",
+      "evidence": {
+        "adoption_rate": 0.0,
+        "total_decisions": 6
+      },
+      "action_taken": "Relaxed min effect 0.100->0.070, p-value 0.100->0.150",
+      "before": {
+        "min_effect_size": 0.1,
+        "p_value_threshold": 0.1
+      },
+      "after": {
+        "min_effect_size": 0.06999999999999999,
+        "p_value_threshold": 0.15
+      }
+    },
+    {
+      "check_type": "compliance_blind_spot",
+      "description": "Generated adversarial borderline compliance cases for manual review",
+      "evidence": {
+        "adversarial_cases": [
+          {
+            "text": "It's important that you address this matter promptly to avoid further complications that may arise from unresolved accounts.",
+            "expected_violation": "Implicit Threat of Legal Action"
+          },
+          {
+            "text": "We are here to assist you with your account management and can provide information that may help you in your current situation.",
+            "expected_violation": "Lack of Clear AI Identification"
+          },
+          {
+            "text": "Many of our clients have faced similar challenges and found that taking action sooner rather than later made a significant difference in their circumstances.",
+            "expected_violation": "Subtle Pressure on Hardship"
+          }
+        ]
+      },
+      "action_taken": "Logged for review. Compliance checker patterns may need updating.",
+      "before": {},
+      "after": {}
+    }
+  ],
+  "metric_configs_updated": false,
+  "threshold_updated": true
+}

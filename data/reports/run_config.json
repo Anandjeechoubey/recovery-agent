@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-03-14T05:58:16.302769+00:00",
+  "settings": {
+    "learning_budget_usd": 20.0,
+    "conversations_per_persona": 3,
+    "max_learning_iterations": 8,
+    "stat_significance_p": 0.1,
+    "min_effect_size": 0.1,
+    "max_total_tokens": 2000,
+    "max_handoff_tokens": 500
+  },
+  "personas": [
+    "cooperative_carl",
+    "combative_carmen",
+    "evasive_eddie",
+    "confused_clara",
+    "distressed_dave"
+  ],
+  "num_personas": 5,
+  "total_conversations_per_batch": 15,
+  "seed_formula": "seed = iteration * 1000 + persona_idx * 10 + repeat  (candidate: +500 offset)",
+  "models": {
+    "simulation_borrower": "gpt-4o-mini",
+    "simulation_agent": "gpt-4o",
+    "evaluation": "gpt-4o-mini",
+    "prompt_proposal": "gpt-4o",
+    "meta_evaluation": "gpt-4o-mini"
+  },
+  "rerun_command": "python -m src.learning.loop"
+}

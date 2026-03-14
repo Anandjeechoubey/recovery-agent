@@ -1,0 +1,30 @@
+{
+  "iteration": 1,
+  "findings": [
+    {
+      "check_type": "compliance_blind_spot",
+      "description": "Generated adversarial borderline compliance cases for manual review",
+      "evidence": {
+        "adversarial_cases": [
+          {
+            "text": "We recommend taking this matter seriously, as unresolved accounts can lead to consequences that may affect your financial standing.",
+            "expected_violation": "implied threat of legal action"
+          },
+          {
+            "text": "Hi! Just checking in on your account. We noticed some irregularities and wanted to discuss them with you. Let us know how we can assist you!",
+            "expected_violation": "lack of clear identification as AI"
+          },
+          {
+            "text": "We understand that times are tough, but it\u2019s important to remember that addressing this situation now can help you avoid more difficult challenges later on.",
+            "expected_violation": "subtle pressure on financial hardship"
+          }
+        ]
+      },
+      "action_taken": "Logged for review. Compliance checker patterns may need updating.",
+      "before": {},
+      "after": {}
+    }
+  ],
+  "metric_configs_updated": false,
+  "threshold_updated": false
+}

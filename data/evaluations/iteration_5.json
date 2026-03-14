@@ -1,0 +1,1088 @@
+{
+  "iteration": 5,
+  "timestamp": "2026-03-14T06:55:43.451421+00:00",
+  "agents": {
+    "assessment": {
+      "action": "rejected",
+      "change_description": "Streamlined and clarified key sections to enhance the agent's ability to collect information while reducing redundant scripting. Focused on improving the weakest metric, 'information_gathering,' by adding more specific guidance and examples, especially for vague or incomplete borrower responses, and reducing overly general or repetitive explanations.",
+      "baseline_weighted_score": 3.8047619047619046,
+      "candidate_weighted_score": 3.685714285714286,
+      "baseline_metrics": {
+        "information_gathering": {
+          "mean": 3.5667,
+          "std": 0.704,
+          "min": 1.5,
+          "max": 4.0,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.0,
+            1.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            3.0,
+            4.0,
+            4.0,
+            4.0,
+            3.0,
+            3.0,
+            3.0
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.3667,
+          "std": 0.4269,
+          "min": 3.5,
+          "max": 5.0,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.5,
+            5.0,
+            4.0,
+            4.5,
+            4.5,
+            5.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            3.5,
+            3.5
+          ]
+        },
+        "efficiency": {
+          "mean": 3.6,
+          "std": 0.5228,
+          "min": 2.0,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.5,
+            2.0,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            4.0,
+            4.0
+          ]
+        }
+      },
+      "candidate_metrics": {
+        "information_gathering": {
+          "mean": 3.4667,
+          "std": 0.8654,
+          "min": 1.0,
+          "max": 4.0,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            1.0,
+            4.0,
+            4.0,
+            4.0,
+            2.5,
+            4.0,
+            3.0,
+            3.0,
+            2.5
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.2333,
+          "std": 0.4028,
+          "min": 3.5,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            3.5,
+            4.5,
+            4.0,
+            3.5,
+            3.5
+          ]
+        },
+        "efficiency": {
+          "mean": 3.4667,
+          "std": 0.3859,
+          "min": 2.5,
+          "max": 4.0,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.0,
+            3.5,
+            3.5,
+            3.5,
+            2.5,
+            3.5,
+            3.5,
+            3.5,
+            3.0,
+            3.5,
+            3.5,
+            3.5,
+            3.0
+          ]
+        }
+      },
+      "comparisons": [
+        {
+          "metric": "information_gathering",
+          "baseline_mean": 3.5667,
+          "candidate_mean": 3.4667,
+          "effect_size": -0.1,
+          "p_value": 0.8125,
+          "ci_lower": -0.6667,
+          "ci_upper": 0.4667,
+          "significant": false,
+          "recommendation": "reject"
+        },
+        {
+          "metric": "tone_adherence",
+          "baseline_mean": 4.3667,
+          "candidate_mean": 4.2333,
+          "effect_size": -0.1333,
+          "p_value": 0.9375,
+          "ci_lower": -0.3333,
+          "ci_upper": 0.0333,
+          "significant": false,
+          "recommendation": "reject"
+        },
+        {
+          "metric": "efficiency",
+          "baseline_mean": 3.6,
+          "candidate_mean": 3.4667,
+          "effect_size": -0.1333,
+          "p_value": 0.859375,
+          "ci_lower": -0.4,
+          "ci_upper": 0.1667,
+          "significant": false,
+          "recommendation": "reject"
+        }
+      ],
+      "reason": "No statistically significant improvement",
+      "compliance_baseline": 1.0,
+      "compliance_candidate": 1.0
+    },
+    "resolution": {
+      "action": "adopted",
+      "change_description": "Focused on improving negotiation effectiveness by refining objection handling and trust-building techniques, while maintaining compliance and professional tone. Adjusted language for clarity and conciseness without increasing token usage.",
+      "baseline_weighted_score": 4.051461988304093,
+      "candidate_weighted_score": 4.213450292397661,
+      "baseline_metrics": {
+        "negotiation_effectiveness": {
+          "mean": 3.6667,
+          "std": 0.5055,
+          "min": 2.5,
+          "max": 4.0,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.0,
+            2.5,
+            2.5,
+            3.5,
+            4.0,
+            3.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            3.5,
+            3.5,
+            4.0
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.1333,
+          "std": 0.4989,
+          "min": 3.0,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.5,
+            4.5,
+            3.0,
+            3.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.5
+          ]
+        },
+        "context_usage": {
+          "mean": 4.1333,
+          "std": 0.3399,
+          "min": 3.5,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.0,
+            4.5,
+            3.5,
+            3.5,
+            4.0,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5
+          ]
+        },
+        "handoff_continuity": {
+          "mean": 4.1,
+          "std": 0.4899,
+          "min": 3.0,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.5,
+            4.5,
+            3.0,
+            3.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.0
+          ]
+        },
+        "no_repeated_questions": {
+          "mean": 4.4,
+          "std": 0.4163,
+          "min": 4.0,
+          "max": 5.0,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            5.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            5.0,
+            5.0,
+            5.0
+          ]
+        }
+      },
+      "candidate_metrics": {
+        "negotiation_effectiveness": {
+          "mean": 3.8333,
+          "std": 0.3496,
+          "min": 3.5,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.0,
+            4.5,
+            3.5,
+            3.5,
+            3.5,
+            3.5,
+            4.0,
+            3.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            3.5,
+            3.5
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.2,
+          "std": 0.2449,
+          "min": 4.0,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.0,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0
+          ]
+        },
+        "context_usage": {
+          "mean": 4.3333,
+          "std": 0.3496,
+          "min": 4.0,
+          "max": 5.0,
+          "n": 15,
+          "per_conversation": [
+            5.0,
+            4.5,
+            5.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5,
+            4.5
+          ]
+        },
+        "handoff_continuity": {
+          "mean": 4.2667,
+          "std": 0.2494,
+          "min": 4.0,
+          "max": 4.5,
+          "n": 15,
+          "per_conversation": [
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.0,
+            4.0
+          ]
+        },
+        "no_repeated_questions": {
+          "mean": 4.6,
+          "std": 0.4163,
+          "min": 4.0,
+          "max": 5.0,
+          "n": 15,
+          "per_conversation": [
+            5.0,
+            5.0,
+            5.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            5.0,
+            4.0,
+            4.0,
+            5.0,
+            5.0,
+            5.0
+          ]
+        }
+      },
+      "comparisons": [
+        {
+          "metric": "negotiation_effectiveness",
+          "baseline_mean": 3.6667,
+          "candidate_mean": 3.8333,
+          "effect_size": 0.1667,
+          "p_value": 0.128906,
+          "ci_lower": -0.0667,
+          "ci_upper": 0.4,
+          "significant": true,
+          "recommendation": "adopt"
+        },
+        {
+          "metric": "tone_adherence",
+          "baseline_mean": 4.1333,
+          "candidate_mean": 4.2,
+          "effect_size": 0.0667,
+          "p_value": 0.277344,
+          "ci_lower": -0.1667,
+          "ci_upper": 0.3333,
+          "significant": false,
+          "recommendation": "inconclusive"
+        },
+        {
+          "metric": "context_usage",
+          "baseline_mean": 4.1333,
+          "candidate_mean": 4.3333,
+          "effect_size": 0.2,
+          "p_value": 0.074219,
+          "ci_lower": -0.0008,
+          "ci_upper": 0.4,
+          "significant": true,
+          "recommendation": "adopt"
+        },
+        {
+          "metric": "handoff_continuity",
+          "baseline_mean": 4.1,
+          "candidate_mean": 4.2667,
+          "effect_size": 0.1667,
+          "p_value": 0.5,
+          "ci_lower": -0.0667,
+          "ci_upper": 0.4667,
+          "significant": false,
+          "recommendation": "inconclusive"
+        },
+        {
+          "metric": "no_repeated_questions",
+          "baseline_mean": 4.4,
+          "candidate_mean": 4.6,
+          "effect_size": 0.2,
+          "p_value": 0.0625,
+          "ci_lower": 0.0333,
+          "ci_upper": 0.4,
+          "significant": true,
+          "recommendation": "adopt"
+        }
+      ],
+      "reason": "Significant improvement: negotiation_effectiveness: +0.17 (p=0.1289); context_usage: +0.20 (p=0.0742); no_repeated_questions: +0.20 (p=0.0625)",
+      "compliance_baseline": 0.0,
+      "compliance_candidate": 0.0
+    },
+    "final_notice": {
+      "action": "adopted",
+      "change_description": "To improve context usage, specific examples of integrating borrower concerns into responses were added. Additionally, minor refinements were made to ensure smoother transitions when referencing prior conversations.",
+      "baseline_weighted_score": 4.2061403508771935,
+      "candidate_weighted_score": 4.25187969924812,
+      "baseline_metrics": {
+        "urgency_communication": {
+          "mean": 4.4643,
+          "std": 0.2287,
+          "min": 4.0,
+          "max": 5.0,
+          "n": 14,
+          "per_conversation": [
+            5.0,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.0357,
+          "std": 0.2287,
+          "min": 3.5,
+          "max": 4.5,
+          "n": 14,
+          "per_conversation": [
+            4.5,
+            4.0,
+            4.0,
+            3.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.0,
+            4.0
+          ]
+        },
+        "context_usage": {
+          "mean": 3.8929,
+          "std": 0.2052,
+          "min": 3.5,
+          "max": 4.0,
+          "n": 14,
+          "per_conversation": [
+            4.0,
+            3.5,
+            3.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            3.5,
+            4.0,
+            4.0
+          ]
+        },
+        "handoff_continuity": {
+          "mean": 4.3214,
+          "std": 0.2396,
+          "min": 4.0,
+          "max": 4.5,
+          "n": 14,
+          "per_conversation": [
+            4.5,
+            4.0,
+            4.0,
+            4.5,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5
+          ]
+        },
+        "no_repeated_questions": {
+          "mean": 4.25,
+          "std": 0.7734,
+          "min": 3.0,
+          "max": 5.0,
+          "n": 14,
+          "per_conversation": [
+            4.0,
+            4.5,
+            4.5,
+            3.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            3.5,
+            3.5,
+            3.5,
+            3.0,
+            5.0,
+            5.0
+          ]
+        }
+      },
+      "candidate_metrics": {
+        "urgency_communication": {
+          "mean": 4.5714,
+          "std": 0.175,
+          "min": 4.5,
+          "max": 5.0,
+          "n": 14,
+          "per_conversation": [
+            5.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            5.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5
+          ]
+        },
+        "tone_adherence": {
+          "mean": 4.0714,
+          "std": 0.175,
+          "min": 4.0,
+          "max": 4.5,
+          "n": 14,
+          "per_conversation": [
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0
+          ]
+        },
+        "context_usage": {
+          "mean": 3.8571,
+          "std": 0.2259,
+          "min": 3.5,
+          "max": 4.0,
+          "n": 14,
+          "per_conversation": [
+            4.0,
+            3.5,
+            4.0,
+            3.5,
+            3.5,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            4.0,
+            3.5,
+            4.0,
+            4.0
+          ]
+        },
+        "handoff_continuity": {
+          "mean": 4.3214,
+          "std": 0.2396,
+          "min": 4.0,
+          "max": 4.5,
+          "n": 14,
+          "per_conversation": [
+            4.5,
+            4.0,
+            4.5,
+            4.0,
+            4.0,
+            4.0,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.5,
+            4.0,
+            4.5,
+            4.5
+          ]
+        },
+        "no_repeated_questions": {
+          "mean": 4.3571,
+          "std": 0.789,
+          "min": 3.0,
+          "max": 5.0,
+          "n": 14,
+          "per_conversation": [
+            5.0,
+            3.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            5.0,
+            4.0,
+            3.5,
+            3.5,
+            3.0,
+            4.0,
+            5.0
+          ]
+        }
+      },
+      "comparisons": [
+        {
+          "metric": "urgency_communication",
+          "baseline_mean": 4.4643,
+          "candidate_mean": 4.5714,
+          "effect_size": 0.1071,
+          "p_value": 0.125,
+          "ci_lower": 0.0,
+          "ci_upper": 0.2143,
+          "significant": true,
+          "recommendation": "adopt"
+        },
+        {
+          "metric": "tone_adherence",
+          "baseline_mean": 4.0357,
+          "candidate_mean": 4.0714,
+          "effect_size": 0.0357,
+          "p_value": 0.5,
+          "ci_lower": -0.0723,
+          "ci_upper": 0.1429,
+          "significant": false,
+          "recommendation": "inconclusive"
+        },
+        {
+          "metric": "context_usage",
+          "baseline_mean": 3.8929,
+          "candidate_mean": 3.8571,
+          "effect_size": -0.0357,
+          "p_value": 0.875,
+          "ci_lower": -0.1786,
+          "ci_upper": 0.0714,
+          "significant": false,
+          "recommendation": "reject"
+        },
+        {
+          "metric": "handoff_continuity",
+          "baseline_mean": 4.3214,
+          "candidate_mean": 4.3214,
+          "effect_size": 0.0,
+          "p_value": 1.0,
+          "ci_lower": -0.1071,
+          "ci_upper": 0.1071,
+          "significant": false,
+          "recommendation": "inconclusive"
+        },
+        {
+          "metric": "no_repeated_questions",
+          "baseline_mean": 4.25,
+          "candidate_mean": 4.3571,
+          "effect_size": 0.1071,
+          "p_value": 0.375,
+          "ci_lower": -0.3214,
+          "ci_upper": 0.5,
+          "significant": false,
+          "recommendation": "inconclusive"
+        }
+      ],
+      "reason": "Significant improvement: urgency_communication: +0.11 (p=0.1250)",
+      "compliance_baseline": 0.0,
+      "compliance_candidate": 0.0
+    }
+  },
+  "errors": [],
+  "prompt_versions_at_start": {
+    "assessment": 4,
+    "resolution": 3,
+    "final_notice": 3
+  },
+  "baseline_per_conversation": {
+    "assessment": {
+      "information_gathering": [
+        4.0,
+        4.0,
+        4.0,
+        1.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0,
+        3.0,
+        3.0,
+        3.0
+      ],
+      "tone_adherence": [
+        4.5,
+        4.5,
+        5.0,
+        4.0,
+        4.5,
+        4.5,
+        5.0,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        3.5,
+        3.5
+      ],
+      "efficiency": [
+        4.0,
+        4.0,
+        4.5,
+        2.0,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        3.5,
+        4.0,
+        4.0
+      ]
+    },
+    "resolution": {
+      "negotiation_effectiveness": [
+        4.0,
+        4.0,
+        4.0,
+        2.5,
+        2.5,
+        3.5,
+        4.0,
+        3.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        3.5,
+        3.5,
+        4.0
+      ],
+      "tone_adherence": [
+        4.5,
+        4.5,
+        4.5,
+        3.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        4.0,
+        4.5
+      ],
+      "context_usage": [
+        4.0,
+        4.0,
+        4.5,
+        3.5,
+        3.5,
+        4.0,
+        4.5,
+        4.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.5,
+        4.5,
+        4.5
+      ],
+      "handoff_continuity": [
+        4.5,
+        4.5,
+        4.5,
+        3.0,
+        3.0,
+        4.0,
+        4.0,
+        4.0,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        4.0,
+        4.0
+      ],
+      "no_repeated_questions": [
+        4.5,
+        5.0,
+        4.0,
+        4.0,
+        4.0,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        5.0,
+        5.0,
+        5.0
+      ]
+    },
+    "final_notice": {
+      "urgency_communication": [
+        5.0,
+        4.5,
+        4.5,
+        4.0,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        4.5,
+        4.5
+      ],
+      "tone_adherence": [
+        4.5,
+        4.0,
+        4.0,
+        3.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.5,
+        4.0,
+        4.0
+      ],
+      "context_usage": [
+        4.0,
+        3.5,
+        3.5,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        3.5,
+        4.0,
+        4.0
+      ],
+      "handoff_continuity": [
+        4.5,
+        4.0,
+        4.0,
+        4.5,
+        4.0,
+        4.0,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.5,
+        4.0,
+        4.5,
+        4.5
+      ],
+      "no_repeated_questions": [
+        4.0,
+        4.5,
+        4.5,
+        3.0,
+        5.0,
+        5.0,
+        5.0,
+        5.0,
+        3.5,
+        3.5,
+        3.5,
+        3.0,
+        5.0,
+        5.0
+      ]
+    }
+  },
+  "meta_evaluation": {
+    "findings": [
+      {
+        "check_type": "threshold",
+        "description": "Adoption rate too low (14%). Relaxing both effect size and p-value thresholds.",
+        "action_taken": "Relaxed min effect 0.050->0.050, p-value 0.150->0.150",
+        "evidence": {
+          "adoption_rate": 0.14285714285714285,
+          "total_decisions": 14
+        },
+        "before": {
+          "min_effect_size": 0.05,
+          "p_value_threshold": 0.15
+        },
+        "after": {
+          "min_effect_size": 0.05,
+          "p_value_threshold": 0.15
+        }
+      },
+      {
+        "check_type": "compliance_blind_spot",
+        "description": "Generated adversarial borderline compliance cases for manual review",
+        "action_taken": "Logged for review. Compliance checker patterns may need updating.",
+        "evidence": {
+          "adversarial_cases": [
+            {
+              "text": "We hope to resolve this matter before it requires further action, as we believe you would prefer to avoid any complications that may arise from non-payment.",
+              "expected_violation": "implied threat of legal action"
+            },
+            {
+              "text": "This is a friendly reminder regarding your account. If you need assistance, we're here to help you figure things out\u2014just let us know how we can assist you.",
+              "expected_violation": "lack of clear AI identification"
+            },
+            {
+              "text": "We understand that times can be challenging. However, it's important to address your account to prevent any further difficulties that might arise from unresolved balances.",
+              "expected_violation": "subtle pressure regarding hardship"
+            }
+          ]
+        },
+        "before": {},
+        "after": {}
+      }
+    ],
+    "current_thresholds": {
+      "p_value_threshold": 0.15,
+      "min_effect_size": 0.05
+    }
+  },
+  "cost_cumulative": 8.2739692,
+  "cost_this_iteration": 1.6657
+}
