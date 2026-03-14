@@ -13,6 +13,7 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from src.api.routes import admin, chat, workflow
+from src.api.routes import auth as auth_route
 from src.api.routes import sse as sse_route
 from src.config import settings
 from src.voice.webhook import router as vapi_router
@@ -87,6 +88,7 @@ app.add_middleware(
 )
 
 # API routes under /api prefix
+app.include_router(auth_route.router, prefix="/api")
 app.include_router(workflow.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(sse_route.router, prefix="/api")

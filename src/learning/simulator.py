@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass, field
 
 import openai
+from langfuse import observe
 
 from src.agents.assessment import AssessmentAgent
 from src.agents.base import BaseAgent
@@ -61,6 +62,7 @@ def make_test_borrower(persona: BorrowerPersona) -> Borrower:
     )
 
 
+@observe()
 async def simulate_conversation(
     agent: BaseAgent,
     persona: BorrowerPersona,
@@ -146,6 +148,7 @@ async def simulate_conversation(
     return conversation
 
 
+@observe(name="simulate_pipeline")
 async def simulate_pipeline(
     persona: BorrowerPersona,
     assessment_prompt: str | None = None,

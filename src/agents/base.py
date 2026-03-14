@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from langfuse import observe
+
 from src.config import get_openai_client, settings
 from src.context.token_budget import count_tokens, enforce_budget
 from src.models.borrower import Borrower
@@ -59,6 +61,7 @@ class BaseAgent:
             max_installments=borrower.policy.max_installments,
         )
 
+    @observe()
     async def respond(
         self,
         conversation: Conversation,

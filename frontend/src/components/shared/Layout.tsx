@@ -1,7 +1,15 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
+
+  function handleLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
 
   const navItems = [
     { path: "/admin", label: "Admin Dashboard" },
@@ -33,6 +41,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 ))}
               </div>
             </div>
+            {isAuthenticated && (
+              <div className="flex items-center">
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.api.dependencies import get_temporal_client
+from src.api.dependencies import get_current_user, get_temporal_client
 from src.config import settings
 from src.db import repo
 from src.models.borrower import Borrower, PolicyRanges

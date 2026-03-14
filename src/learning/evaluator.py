@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from langfuse import observe
+
 from src.config import get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.models.conversation import Conversation
@@ -71,6 +73,7 @@ SYSTEM_METRICS = [
 ]
 
 
+@observe()
 async def evaluate_conversation(
     conversation: Conversation,
     cost_tracker: CostTracker | None = None,
@@ -124,6 +127,7 @@ async def evaluate_conversation(
         return {}
 
 
+@observe()
 async def evaluate_pipeline(
     conversations: list[Conversation],
     cost_tracker: CostTracker | None = None,

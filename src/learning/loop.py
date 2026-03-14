@@ -8,7 +8,12 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import numpy as np
+from langfuse import get_client as get_langfuse_client
+from langfuse import observe
 
 from src.agents.assessment import ASSESSMENT_PROMPT, AssessmentAgent
 from src.agents.final_notice import FINAL_NOTICE_PROMPT, FinalNoticeAgent
@@ -38,6 +43,7 @@ DEFAULT_PROMPTS = {
 }
 
 
+@observe(name="learning_loop")
 async def run_learning_loop() -> None:
     """Run the full self-learning loop."""
     cost_tracker = CostTracker(budget_usd=settings.learning_budget_usd)
@@ -255,7 +261,11 @@ async def run_learning_loop() -> None:
     # Save full evolution data
     _save_evolution_data(all_iteration_data)
 
+    # Flush all traces to Langfuse
+    get_langfuse_client().flush()
 
+
+@observe()
 async def _run_evaluation_batch(
     prompts: dict[str, str],
     cost_tracker: CostTracker,

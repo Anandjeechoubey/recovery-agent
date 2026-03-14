@@ -1,3 +1,5 @@
+from langfuse import observe
+
 from src.config import get_openai_client, settings
 from src.context.token_budget import count_tokens, truncate_to_tokens
 from src.models.conversation import Conversation, HandoffSummary
@@ -20,6 +22,7 @@ Conversation transcript:
 {transcript}"""
 
 
+@observe()
 async def summarize_for_handoff(
     conversations: list[Conversation],
     max_tokens: int = 500,

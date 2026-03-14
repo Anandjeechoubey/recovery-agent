@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
+from langfuse import observe
+
 from src.config import get_openai_client, settings
 from src.learning.cost_tracker import CostTracker
 from src.learning.evaluator import evaluate_conversation
@@ -74,6 +76,7 @@ class MetaEvaluator:
     def record_adoption(self, adopted: bool) -> None:
         self.adoption_history.append(adopted)
 
+    @observe()
     async def run_meta_evaluation(
         self,
         iteration: int,
@@ -111,6 +114,7 @@ class MetaEvaluator:
         report.save()
         return report
 
+    @observe()
     async def _check_metric_reliability(
         self,
         conversations: list[Conversation],
@@ -295,6 +299,7 @@ class MetaEvaluator:
 
         return None
 
+    @observe()
     async def _check_compliance_blind_spots(self) -> MetaEvalFinding | None:
         """Generate adversarial borderline cases and test compliance checker."""
         client = get_openai_client()

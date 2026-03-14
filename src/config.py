@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from openai import AsyncAzureOpenAI
+from langfuse.openai import AsyncAzureOpenAI
 from pydantic_settings import BaseSettings
 
 
@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     max_learning_iterations: int = 8
     stat_significance_p: float = 0.10  # relaxed for small samples; meta-evaluator can tighten
     min_effect_size: float = 0.1  # 0.1 on 1-5 scale is meaningful with 0.5-increment scoring
+
+    # Auth
+    jwt_secret_key: str = "dev-secret-key-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 480  # 8 hours
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

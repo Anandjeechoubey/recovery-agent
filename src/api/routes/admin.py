@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from src.api.dependencies import get_current_user
 from src.learning.prompt_store import PromptStore
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(get_current_user)])
 
 _store = PromptStore()
 

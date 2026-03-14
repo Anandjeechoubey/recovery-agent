@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from langfuse import observe
+
 from src.config import get_openai_client, settings
 from src.context.token_budget import count_tokens
 from src.learning.cost_tracker import CostTracker
@@ -74,6 +76,7 @@ def _get_mutation_strategy(utilization_pct: int) -> str:
         )
 
 
+@observe()
 async def propose_prompt_mutation(
     agent_type: str,
     current_prompt: str,

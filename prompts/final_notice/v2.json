@@ -49,6 +49,6 @@
     "reason": "Significant improvement: no_repeated_questions: +0.50 (p=0.0312)",
     "change_description": "Added a 'Context Integration' section with examples to improve how the agent acknowledges borrower concerns and incorporates prior conversations fluidly into the dialogue. Also added 'Handling Financial Concerns' scripts to address borrower-specific financial worries while maintaining compliance and tone adherence."
   },
-  "is_active": true,
+  "is_active": false,
   "parent_version_id": "663c021c"
 }
