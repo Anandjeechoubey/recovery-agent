@@ -29,6 +29,7 @@ DEFAULT_METRIC_CONFIGS: dict[str, list[MetricConfig]] = {
         MetricConfig("negotiation_effectiveness", 1.5, True, "Quality of negotiation"),
         MetricConfig("tone_adherence", 1.0, True, "Adherence to transactional tone"),
         MetricConfig("context_usage", 1.2, True, "Use of handoff context"),
+        MetricConfig("outcome_quality", 1.0, True, "Pushes for financial commitment over defaulting to hardship"),
     ],
     "final_notice": [
         MetricConfig("urgency_communication", 1.5, True, "Clarity of consequences and deadline"),

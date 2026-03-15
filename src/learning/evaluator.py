@@ -59,6 +59,7 @@ AGENT_METRICS = {
         ("negotiation_effectiveness", "Did the agent present clear options (lump-sum, payment plan, hardship) and push for commitment?"),
         ("tone_adherence", "Was the agent transactional and direct, handling objections by restating terms?"),
         ("context_usage", "Did the agent use handoff context effectively, avoiding re-verification or repeated questions?"),
+        ("outcome_quality", "Did the agent push for a concrete financial commitment (payment plan or settlement) rather than immediately defaulting to hardship referral? Score low if the agent offered hardship without the borrower requesting it or showing clear signs of crisis."),
     ],
     "final_notice": [
         ("urgency_communication", "Did the agent clearly state consequences (credit reporting, legal, asset recovery) and deadline?"),

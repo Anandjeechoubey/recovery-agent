@@ -3,12 +3,31 @@
 from __future__ import annotations
 
 import json
+import re
 
 from langfuse import observe
 
 from src.config import call_openai_with_retry, get_openai_client, settings
 from src.context.token_budget import count_tokens
 from src.learning.cost_tracker import CostTracker
+
+ALLOWED_TEMPLATE_VARS = {
+    "borrower_name", "account_last4", "total_debt", "debt_type",
+    "days_past_due", "min_settlement_pct", "max_settlement_pct", "max_installments",
+}
+
+
+def _validate_template_vars(prompt: str) -> list[str]:
+    """Find any template variables in prompt that aren't in the allowed set.
+
+    Matches {var_name} but ignores escaped braces {{ }} and JSON-like structures.
+    """
+    # Find all single-brace {word} patterns (not double-brace)
+    # Remove doubled braces first
+    cleaned = prompt.replace("{{", "").replace("}}", "")
+    found = re.findall(r"\{(\w+)\}", cleaned)
+    invalid = [v for v in found if v not in ALLOWED_TEMPLATE_VARS]
+    return invalid
 
 PROPOSE_PROMPT = """You are optimizing a system prompt for an AI debt collections agent.
 
@@ -39,7 +58,9 @@ COMPLIANCE REQUIREMENTS (MUST be preserved — do not remove any of these):
 - No false threats — only state documented next steps
 - Maintain professional composure at all times
 
-IMPORTANT: The new prompt MUST contain all template variables from the current prompt (like {{borrower_name}}, {{account_last4}}, {{total_debt}}, etc.). Do not remove or rename them.
+IMPORTANT: The new prompt MUST use ONLY these template variables (and no others):
+  {{borrower_name}}, {{account_last4}}, {{total_debt}}, {{debt_type}}, {{days_past_due}}, {{min_settlement_pct}}, {{max_settlement_pct}}, {{max_installments}}
+Do NOT invent new template variables like {{employment_status}}, {{settlement_amount}}, {{amount}}, etc. — they will cause runtime errors. Use literal text or reference the handoff context instead.
 
 Respond with JSON:
 {{
@@ -50,29 +71,38 @@ Respond with JSON:
 
 def _get_mutation_strategy(utilization_pct: int) -> str:
     """Select mutation strategy based on how much of the token budget is used."""
+    common_guidance = (
+        "\n\nIMPORTANT PRINCIPLES:\n"
+        "- Make ONE focused change targeting the weakest metric. Do not rewrite the entire prompt.\n"
+        "- Keep what works — only modify the section relevant to the weakness.\n"
+        "- Be specific: add concrete example phrases or step-by-step scripts, not vague instructions.\n"
+        "- Effective changes: adding 2-3 example agent responses, adding a numbered behavioral checklist, "
+        "rewriting vague instructions as specific rules with examples.\n"
+        "- Ineffective changes: adding generic encouragement, rewriting tone descriptions without "
+        "concrete examples, restructuring sections that already work well."
+    )
+
     if utilization_pct < 50:
         return (
             f"STRATEGY: EXPAND. The current prompt uses only {utilization_pct}% of the available "
-            f"token budget — there is massive room for improvement. You should SUBSTANTIALLY "
-            f"expand the prompt. Add detailed behavioral scripts, conversation flow guidance, "
-            f"example phrasings, per-scenario handling instructions, tone calibration examples, "
-            f"and specific rubrics targeting the weakest metric. A richer, more detailed prompt "
-            f"gives the agent much more to work with. Target using 70-85% of the token budget. "
-            f"Focus your expansion primarily on improving {'{weakest_metric}'}."
+            f"token budget — there is room for improvement. Add specific guidance targeting "
+            f"the weakest metric: concrete example dialogues, step-by-step scripts, or "
+            f"per-scenario handling instructions. Target using 60-75% of the token budget."
+            + common_guidance
         )
     elif utilization_pct < 75:
         return (
             f"STRATEGY: TARGETED EXPANSION. The prompt uses {utilization_pct}% of budget — "
-            f"there is room to add content. Add 2-3 new sections or paragraphs of specific "
-            f"guidance targeting the weakest metric. You may add examples, behavioral scripts, "
-            f"or handling instructions. Do not remove existing content that is working well."
+            f"there is room to add content. Add 1-2 new paragraphs of specific "
+            f"guidance targeting the weakest metric."
+            + common_guidance
         )
     else:
         return (
             f"STRATEGY: SURGICAL EDIT. The prompt is near capacity ({utilization_pct}% of budget). "
             f"Make targeted modifications to improve the weakest metric without significantly "
-            f"changing the overall length. You may restructure, refine wording, or replace "
-            f"underperforming sections. Preserve the overall structure and length."
+            f"changing the overall length. Refine or replace the weakest section."
+            + common_guidance
         )
 
 
@@ -139,6 +169,14 @@ async def propose_prompt_mutation(
         new_tokens = count_tokens(new_prompt)
         if new_tokens > max_tokens:
             return "Proposed prompt exceeds token budget, rejected", current_prompt
+
+        # Validate template variables — reject prompts with unknown vars
+        invalid_vars = _validate_template_vars(new_prompt)
+        if invalid_vars:
+            return (
+                f"Proposed prompt contains invalid template variables: {invalid_vars}, rejected",
+                current_prompt,
+            )
 
         return description, new_prompt
     except (json.JSONDecodeError, KeyError):

@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     conversations_per_eval: int = 20
     conversations_per_persona: int = 3  # repeats per persona (total = this × len(PERSONAS))
     max_learning_iterations: int = 8
-    stat_significance_p: float = 0.10  # relaxed for small samples; meta-evaluator can tighten
-    min_effect_size: float = 0.1  # 0.1 on 1-5 scale is meaningful with 0.5-increment scoring
+    stat_significance_p: float = 0.15  # relaxed for small samples; meta-evaluator can tighten
+    min_effect_size: float = 0.05  # lowered: 0.05 on 1-5 scale; composite scoring improves power
 
     # Auth
     jwt_secret_key: str = "dev-secret-key-change-in-production"

@@ -67,6 +67,8 @@ class MetaEvaluator:
         self.cost_tracker = cost_tracker
         self.eval_history: list[dict] = []  # History of all evaluation results
         self.adoption_history: list[bool] = []  # History of adopt/reject decisions
+        self.outcome_history: list[str] = []  # Track pipeline outcomes per conversation
+        self.per_persona_outcomes: dict[str, list[str]] = {}  # persona -> [outcomes]
         self.p_value_threshold: float = settings.stat_significance_p
         self.min_effect_size: float = settings.min_effect_size
 
@@ -75,6 +77,12 @@ class MetaEvaluator:
 
     def record_adoption(self, adopted: bool) -> None:
         self.adoption_history.append(adopted)
+
+    def record_outcome(self, outcome: str, persona: str = "") -> None:
+        """Track pipeline outcomes for distribution analysis."""
+        self.outcome_history.append(outcome)
+        if persona:
+            self.per_persona_outcomes.setdefault(persona, []).append(outcome)
 
     @observe()
     async def run_meta_evaluation(
@@ -107,6 +115,15 @@ class MetaEvaluator:
         if threshold_finding:
             report.findings.append(threshold_finding)
             report.threshold_updated = True
+
+        outcome_finding = self._check_outcome_distribution()
+        if outcome_finding:
+            report.findings.append(outcome_finding)
+            report.metric_configs_updated = True
+
+        persona_finding = self._check_persona_outcome_stagnation()
+        if persona_finding:
+            report.findings.append(persona_finding)
 
         if compliance_finding:
             report.findings.append(compliance_finding)
@@ -266,7 +283,7 @@ class MetaEvaluator:
 
     def _check_threshold_calibration(self) -> MetaEvalFinding | None:
         """Check if adoption threshold is too aggressive or conservative."""
-        if len(self.adoption_history) < 4:
+        if len(self.adoption_history) < 3:
             return None
 
         adoption_rate = sum(self.adoption_history) / len(self.adoption_history)
@@ -283,18 +300,90 @@ class MetaEvaluator:
                 after={"p_value_threshold": self.p_value_threshold},
             )
 
-        if adoption_rate < 0.15:
+        if adoption_rate < 0.25:
             old_effect = self.min_effect_size
             old_p = self.p_value_threshold
-            self.min_effect_size = max(0.05, old_effect * 0.7)
-            self.p_value_threshold = min(0.15, old_p * 1.5)
+            self.min_effect_size = max(0.03, old_effect * 0.5)
+            self.p_value_threshold = min(0.20, old_p * 1.5)
             return MetaEvalFinding(
                 check_type="threshold",
-                description=f"Adoption rate too low ({adoption_rate:.0%}). Relaxing both effect size and p-value thresholds.",
+                description=f"Adoption rate too low ({adoption_rate:.0%}). Aggressively relaxing thresholds.",
                 evidence={"adoption_rate": adoption_rate, "total_decisions": len(self.adoption_history)},
                 action_taken=f"Relaxed min effect {old_effect:.3f}->{self.min_effect_size:.3f}, p-value {old_p:.3f}->{self.p_value_threshold:.3f}",
                 before={"min_effect_size": old_effect, "p_value_threshold": old_p},
                 after={"min_effect_size": self.min_effect_size, "p_value_threshold": self.p_value_threshold},
+            )
+
+        return None
+
+    def _check_outcome_distribution(self) -> MetaEvalFinding | None:
+        """Check if hardship outcomes are over-represented, indicating evaluation bias."""
+        if len(self.outcome_history) < 10:
+            return None
+
+        from collections import Counter
+        counts = Counter(self.outcome_history)
+        total = len(self.outcome_history)
+        hardship_count = counts.get("hardship_requested", 0) + counts.get("hardship_offered", 0)
+        hardship_pct = hardship_count / total
+
+        if hardship_pct > 0.45:
+            # Boost outcome_quality metric weight to counteract hardship bias
+            before_weights = {}
+            after_weights = {}
+            for agent_type, configs in DEFAULT_METRIC_CONFIGS.items():
+                for mc in configs:
+                    if mc.name == "outcome_quality":
+                        before_weights[f"{agent_type}.outcome_quality"] = mc.weight
+                        mc.weight = min(2.0, mc.weight * 1.5)
+                        after_weights[f"{agent_type}.outcome_quality"] = mc.weight
+
+            return MetaEvalFinding(
+                check_type="outcome_distribution",
+                description=(
+                    f"Hardship outcomes over-represented ({hardship_pct:.0%} of conversations). "
+                    f"Agents may be defaulting to hardship referral instead of negotiating."
+                ),
+                evidence={
+                    "outcome_counts": dict(counts),
+                    "hardship_pct": round(hardship_pct, 3),
+                    "total_conversations": total,
+                },
+                action_taken="Increased outcome_quality metric weight by 50% to incentivize financial commitment over hardship default.",
+                before=before_weights,
+                after=after_weights,
+            )
+
+        return None
+
+    def _check_persona_outcome_stagnation(self) -> MetaEvalFinding | None:
+        """Check if specific personas always produce the same outcome (no learning)."""
+        if not self.per_persona_outcomes:
+            return None
+
+        stagnant = []
+        for persona, outcomes in self.per_persona_outcomes.items():
+            if len(outcomes) < 6:
+                continue
+            from collections import Counter
+            counts = Counter(outcomes)
+            most_common_pct = counts.most_common(1)[0][1] / len(outcomes)
+            if most_common_pct > 0.85:
+                stagnant.append({
+                    "persona": persona,
+                    "dominant_outcome": counts.most_common(1)[0][0],
+                    "pct": round(most_common_pct, 2),
+                    "total": len(outcomes),
+                })
+
+        if stagnant:
+            return MetaEvalFinding(
+                check_type="persona_stagnation",
+                description=f"Some personas always produce the same outcome: {[s['persona'] for s in stagnant]}",
+                evidence={"stagnant_personas": stagnant},
+                action_taken="Logged for review. Prompt mutations should target behavioral diversity for these personas.",
+                before={},
+                after={},
             )
 
         return None

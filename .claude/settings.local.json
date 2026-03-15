@@ -23,7 +23,9 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/api/routes/docs.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/db/repo.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/api/routes/workflow.py''\\).read\\(\\)\\); print\\(''All Python files parse OK''\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/simulator.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/workflow/activities.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/workflow/collections_workflow.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/learning/simulator.py''\\).read\\(\\)\\); print\\(''All OK''\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/personas.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); print\\(''OK''\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/personas.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(grep -r employment_status /Users/anandjeechoubey/pilots/recovery-agents --include=*.md --include=*.json)",
+      "Bash(python3:*)"
     ]
   }
 }

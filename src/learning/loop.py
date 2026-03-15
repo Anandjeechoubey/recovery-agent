@@ -30,7 +30,7 @@ from src.learning.personas import PERSONAS
 from src.learning.prompt_proposer import propose_prompt_mutation
 from src.learning.prompt_store import PromptStore
 from src.learning.simulator import PipelineResult, simulate_pipeline
-from src.learning.statistical import ComparisonResult, should_adopt, wilcoxon_compare
+from src.learning.statistical import ComparisonResult, compare_composite, should_adopt, wilcoxon_compare
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -224,7 +224,40 @@ async def _improve_single_agent(
             )
             comparisons.append(comp)
 
-    adopt, reason = should_adopt(comparisons, baseline_compliance, candidate_compliance)
+    # Compute composite score comparison for higher statistical power
+    from src.learning.metrics import DEFAULT_METRIC_CONFIGS, MetricConfig
+    metric_weights = {
+        mc.name: mc.weight
+        for mc in DEFAULT_METRIC_CONFIGS.get(agent_type, [])
+        if mc.enabled
+    }
+
+    def _compute_per_conv_composite(evals: list[dict]) -> list[float]:
+        composites = []
+        for eval_data in evals:
+            total_w, total_s = 0.0, 0.0
+            for mname, mdata in eval_data.items():
+                if isinstance(mdata, dict) and "score" in mdata:
+                    w = metric_weights.get(mname, 1.0)
+                    total_w += w
+                    total_s += mdata["score"] * w
+            if total_w > 0:
+                composites.append(total_s / total_w)
+        return composites
+
+    baseline_composites = _compute_per_conv_composite(agent_evals)
+    candidate_composites = _compute_per_conv_composite(candidate_evals)
+    composite_result = None
+    if baseline_composites and candidate_composites:
+        min_len = min(len(baseline_composites), len(candidate_composites))
+        composite_result = compare_composite(
+            baseline_composites[:min_len],
+            candidate_composites[:min_len],
+            alpha=meta_evaluator.p_value_threshold,
+            min_effect=meta_evaluator.min_effect_size,
+        )
+
+    adopt, reason = should_adopt(comparisons, baseline_compliance, candidate_compliance, composite_result)
     logger.info(f"  {agent_type}: {'ADOPT' if adopt else 'REJECT'} — {reason}")
 
     meta_evaluator.record_adoption(adopt)
@@ -376,6 +409,11 @@ async def run_learning_loop() -> None:
                 iteration,
             )
             all_raw_rows.extend(baseline_rows)
+
+            # Record outcomes for meta-evaluator's distribution analysis
+            for pr in baseline_results["pipeline_results"]:
+                persona_name = pr.conversations[0].borrower_id.replace("test-", "") if pr.conversations else ""
+                meta_evaluator.record_outcome(pr.final_outcome, persona_name)
 
             iteration_data["baseline_per_conversation"] = {}
             for agent_type in AGENT_TYPES:

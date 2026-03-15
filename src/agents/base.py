@@ -48,18 +48,33 @@ class BaseAgent:
 
         return messages
 
+    # The only template variables available for prompt rendering
+    ALLOWED_TEMPLATE_VARS = {
+        "borrower_name", "account_last4", "total_debt", "debt_type",
+        "days_past_due", "min_settlement_pct", "max_settlement_pct", "max_installments",
+    }
+
     def _render_system_prompt(self, borrower: Borrower) -> str:
-        """Inject borrower details into system prompt template."""
-        return self.system_prompt.format(
-            borrower_name=borrower.name,
-            account_last4=borrower.account_last4,
-            total_debt=f"${borrower.total_debt:,.2f}",
-            debt_type=borrower.debt_type.replace("_", " "),
-            days_past_due=borrower.days_past_due,
-            min_settlement_pct=int(borrower.policy.min_settlement_pct * 100),
-            max_settlement_pct=int(borrower.policy.max_settlement_pct * 100),
-            max_installments=borrower.policy.max_installments,
-        )
+        """Inject borrower details into system prompt template.
+
+        Uses format_map with a fallback so unknown template variables
+        (e.g. from LLM-proposed prompts) don't cause KeyErrors.
+        """
+        from collections import defaultdict
+
+        known_vars = {
+            "borrower_name": borrower.name,
+            "account_last4": borrower.account_last4,
+            "total_debt": f"${borrower.total_debt:,.2f}",
+            "debt_type": borrower.debt_type.replace("_", " "),
+            "days_past_due": borrower.days_past_due,
+            "min_settlement_pct": int(borrower.policy.min_settlement_pct * 100),
+            "max_settlement_pct": int(borrower.policy.max_settlement_pct * 100),
+            "max_installments": borrower.policy.max_installments,
+        }
+        # defaultdict returns "{key}" for any unknown variable, preventing KeyError
+        safe_vars = defaultdict(lambda: "", known_vars)
+        return self.system_prompt.format_map(safe_vars)
 
     @observe()
     async def respond(

@@ -46,6 +46,8 @@ def make_test_borrower(persona: BorrowerPersona) -> Borrower:
         "evasive_eddie": (3100, "credit_card", "9156"),
         "confused_clara": (2800, "credit_card", "5502"),
         "distressed_dave": (5400, "auto_loan", "4478"),
+        "pragmatic_pat": (3800, "personal_loan", "6234"),
+        "skeptical_sam": (4100, "credit_card", "8817"),
     }
     debt, dtype, last4 = debt_map.get(persona.name, (4000, "credit_card", "0000"))
     name = persona.name.split("_")[1].capitalize()
@@ -198,8 +200,11 @@ async def simulate_pipeline(
         conv2.outcome = "hardship_requested"
         result.final_outcome = "hardship_requested"
         return result
-
-    conv2.outcome = "no_deal"
+    elif resolution_outcome == "hardship_offered":
+        # Agent offered but borrower didn't explicitly accept — continue to final notice
+        conv2.outcome = "hardship_offered"
+    else:
+        conv2.outcome = "no_deal"
 
     # Handoff 2→3
     handoff_2to3 = await summarize_for_handoff([conv1, conv2])
@@ -256,18 +261,24 @@ async def _llm_check_outcome(messages: list, stage: str) -> str:
 Transcript:
 {transcript}
 
-Classify the outcome of this conversation into exactly one of three categories:
+Classify the outcome of this conversation into exactly one of these categories:
 
 1. "agreed" — the borrower clearly agreed to a {stage_context}.
-   Signals: "yes", "okay", "I can do that", "go ahead", "sounds good", "I agree", "I accept", "I'll pay", "deal", etc.
-   Also if the agent confirmed a deal and the borrower did not object.
+   Signals: explicit acceptance like "yes", "I can do that", "go ahead", "I agree", "I accept", "I'll pay", "deal", "set it up", "that works".
+   The borrower must have clearly committed to a specific payment arrangement.
 
-2. "hardship_requested" — the borrower requested or was enrolled in a hardship program, financial hardship assistance, forbearance, or similar relief program.
-   Signals: mentions of "hardship", "hardship program", "financial hardship", "forbearance", "relief program", "payment pause", "reduced payments due to hardship", or the agent offered/enrolled them in a hardship program.
+2. "hardship_requested" — the BORROWER explicitly asked for or accepted enrollment in a hardship/relief program.
+   STRICT CRITERIA: The borrower themselves must have requested hardship assistance or accepted a hardship program offer.
+   - The agent merely mentioning hardship availability does NOT count.
+   - The borrower saying "I can't afford this" alone does NOT count — they must specifically ask for or accept a hardship program.
+   - Signals: borrower says "I'd like to enroll in the hardship program", "yes, please refer me to hardship", "I need hardship assistance".
 
-3. "none" — neither agreement nor hardship request occurred.
+3. "hardship_offered" — the agent offered a hardship program but the borrower did NOT explicitly accept or request it.
+   Use this when the agent mentioned hardship but the borrower was vague, non-committal, or the conversation ended before the borrower accepted.
 
-Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requested"}}, or {{"outcome": "none"}}"""
+4. "none" — no agreement, no hardship enrollment. Borrower stalled, refused, or conversation was inconclusive.
+
+Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requested"}}, {{"outcome": "hardship_offered"}}, or {{"outcome": "none"}}"""
 
     try:
         client = get_openai_client()
@@ -281,29 +292,31 @@ Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requeste
         )
         result = json.loads(response.choices[0].message.content or "{}")
         outcome = result.get("outcome", "none")
-        if outcome not in ("agreed", "hardship_requested", "none"):
+        if outcome not in ("agreed", "hardship_requested", "hardship_offered", "none"):
             outcome = "none"
         logger.info(f"  LLM outcome judge ({stage}): {outcome}")
         return outcome
     except Exception as e:
         logger.warning(f"LLM outcome check failed for {stage}, falling back to keyword match: {e}")
-        # Fallback keyword check
+        # Fallback keyword check — strict: only borrower text
         borrower_texts = [msg.content.lower() for msg in messages if msg.role == "borrower"]
-        all_text = " ".join(borrower_texts)
+        all_borrower_text = " ".join(borrower_texts)
 
-        hardship_keywords = [
-            "hardship", "hardship program", "financial hardship", "forbearance",
-            "relief program", "payment pause", "can't afford",
+        # Strict hardship: borrower must explicitly request enrollment
+        hardship_request_keywords = [
+            "enroll me in hardship", "i'd like the hardship program",
+            "yes, hardship", "please refer me to hardship",
+            "i need hardship assistance", "sign me up for hardship",
         ]
-        if any(kw in all_text for kw in hardship_keywords):
+        if any(kw in all_borrower_text for kw in hardship_request_keywords):
             return "hardship_requested"
 
         agreement_keywords = [
-            "i agree", "i accept", "i'll pay", "i will pay", "yes", "go ahead",
-            "sounds good", "that works", "i can do that", "deal", "okay", "ok",
-            "sure", "alright", "let's do it", "set it up",
+            "i agree", "i accept", "i'll pay", "i will pay",
+            "go ahead", "sounds good", "that works", "i can do that",
+            "deal", "let's do it", "set it up",
         ]
-        if any(kw in all_text for kw in agreement_keywords):
+        if any(kw in all_borrower_text for kw in agreement_keywords):
             return "agreed"
 
         return "none"

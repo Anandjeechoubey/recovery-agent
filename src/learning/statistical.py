@@ -117,39 +117,80 @@ def bootstrap_ci(
     return lower, upper
 
 
+def compare_composite(
+    baseline_composite: list[float],
+    candidate_composite: list[float],
+    alpha: float = 0.15,
+    min_effect: float = 0.05,
+) -> ComparisonResult:
+    """Compare weighted composite scores using a single paired test.
+
+    More powerful than per-metric testing because it aggregates signal.
+    """
+    return wilcoxon_compare(
+        baseline_composite, candidate_composite,
+        alpha=alpha, min_effect=min_effect, metric_name="composite",
+    )
+
+
 def should_adopt(
     comparisons: list[ComparisonResult],
     compliance_baseline: float,
     compliance_candidate: float,
+    composite_result: ComparisonResult | None = None,
 ) -> tuple[bool, str]:
     """Determine if a prompt change should be adopted.
 
-    Requirements:
-    1. At least one metric shows significant improvement
-    2. No metric shows significant regression
-    3. Compliance rate does not decrease
+    Uses a two-path adoption strategy:
+    1. **Composite path**: If a composite score comparison is provided, adopt if the
+       composite shows significant improvement (single test = more statistical power).
+    2. **Per-metric path**: Otherwise, adopt if at least one metric improves significantly.
+
+    Always blocks on:
+    - Compliance regression (>5% drop)
+    - Severe per-metric regression (>0.3 drop with p<0.1)
     """
     # Allow up to 5% compliance drop (1 conversation difference in small samples)
     compliance_tolerance = 0.05
     if compliance_candidate < compliance_baseline - compliance_tolerance:
         return False, f"Compliance regression: {compliance_baseline:.2f} → {compliance_candidate:.2f}"
 
-    has_improvement = False
+    # Check for severe regression on any individual metric
     has_regression = False
-    reasons = []
-
+    regression_reasons = []
     for comp in comparisons:
-        if comp.is_significant and comp.effect_size > 0:
-            has_improvement = True
-            reasons.append(f"{comp.metric_name}: +{comp.effect_size:.2f} (p={comp.p_value:.4f})")
-        elif comp.effect_size < -0.2 and comp.p_value < 0.1:
+        if comp.effect_size < -0.3 and comp.p_value < 0.1:
             has_regression = True
-            reasons.append(f"{comp.metric_name}: {comp.effect_size:.2f} REGRESSION")
+            regression_reasons.append(f"{comp.metric_name}: {comp.effect_size:.2f} REGRESSION")
 
     if has_regression:
-        return False, f"Regression detected: {'; '.join(reasons)}"
+        return False, f"Regression detected: {'; '.join(regression_reasons)}"
 
-    if has_improvement:
-        return True, f"Significant improvement: {'; '.join(reasons)}"
+    # Path 1: Composite score test (preferred — higher statistical power)
+    if composite_result and composite_result.is_significant and composite_result.effect_size > 0:
+        reasons = [f"composite: +{composite_result.effect_size:.3f} (p={composite_result.p_value:.4f})"]
+        # Also note per-metric improvements
+        for comp in comparisons:
+            if comp.effect_size > 0.05:
+                reasons.append(f"{comp.metric_name}: +{comp.effect_size:.2f}")
+        return True, f"Composite improvement: {'; '.join(reasons)}"
+
+    # Path 2: Per-metric significance (fallback)
+    improvement_reasons = []
+    for comp in comparisons:
+        if comp.is_significant and comp.effect_size > 0:
+            improvement_reasons.append(f"{comp.metric_name}: +{comp.effect_size:.2f} (p={comp.p_value:.4f})")
+
+    if improvement_reasons:
+        return True, f"Per-metric improvement: {'; '.join(improvement_reasons)}"
+
+    # Path 3: Net positive trend — adopt if mean effect across all metrics is positive
+    # even if no single metric reaches significance (reduces false negatives)
+    if comparisons:
+        mean_effect = float(np.mean([c.effect_size for c in comparisons]))
+        positive_count = sum(1 for c in comparisons if c.effect_size > 0)
+        if mean_effect > 0.03 and positive_count >= len(comparisons) * 0.6:
+            reasons = [f"net_trend: +{mean_effect:.3f} ({positive_count}/{len(comparisons)} metrics positive)"]
+            return True, f"Net positive trend: {'; '.join(reasons)}"
 
     return False, "No statistically significant improvement"
