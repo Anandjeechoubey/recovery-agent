@@ -19,7 +19,11 @@
       "Bash(grep -n \"TODO\\\\|FIXME\\\\|BUG\\\\|XXX\\\\|ISSUE\" /Users/anandjeechoubey/pilots/recovery-agents/src/learning/*.py)",
       "Bash(python -c \":*)",
       "Bash(find /Users/anandjeechoubey/pilots/recovery-agents -type f \\\\\\(-name *sql -o -name *database* -o -name *db* -o -name alembic.ini -o -name migrations \\\\\\))",
-      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /Users/anandjeechoubey/pilots/recovery-agents/src --include=*.py)"
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\" /Users/anandjeechoubey/pilots/recovery-agents/src --include=*.py)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/api/routes/docs.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/db/repo.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/api/routes/workflow.py''\\).read\\(\\)\\); print\\(''All Python files parse OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/simulator.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/workflow/activities.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/workflow/collections_workflow.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/learning/simulator.py''\\).read\\(\\)\\); print\\(''All OK''\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/personas.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); print\\(''OK''\\)\")"
     ]
   }
 }

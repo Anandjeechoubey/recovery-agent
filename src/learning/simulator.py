@@ -187,13 +187,16 @@ async def simulate_pipeline(
     )
     result.conversations.append(conv2)
 
-    # Check if deal was agreed
-    logger.info("Check if deal was agreed")
-    borrower_msgs = [m for m in conv2.messages if m.role == "borrower"]
-    deal_keywords = ["agree", "accept", "i'll pay", "deal", "go ahead", "set it up", "fine"]
-    if borrower_msgs and any(kw in borrower_msgs[-1].content.lower() for kw in deal_keywords):
+    # Check resolution outcome — LLM-as-judge
+    logger.info("Check resolution outcome (LLM judge)")
+    resolution_outcome = await _llm_check_outcome(conv2.messages, stage="resolution")
+    if resolution_outcome == "agreed":
         conv2.outcome = "deal_agreed"
         result.final_outcome = "agreement"
+        return result
+    elif resolution_outcome == "hardship_requested":
+        conv2.outcome = "hardship_requested"
+        result.final_outcome = "hardship_requested"
         return result
 
     conv2.outcome = "no_deal"
@@ -214,18 +217,96 @@ async def simulate_pipeline(
     )
     result.conversations.append(conv3)
 
-    # Check final outcome
-    logger.info("Final outcome")
-    borrower_msgs3 = [m for m in conv3.messages if m.role == "borrower"]
-    resolve_keywords = ["accept", "agree", "i'll pay", "fine", "go ahead"]
-    if borrower_msgs3 and any(kw in borrower_msgs3[-1].content.lower() for kw in resolve_keywords):
+    # Check final outcome — LLM-as-judge
+    logger.info("Final outcome (LLM judge)")
+    final_outcome = await _llm_check_outcome(conv3.messages, stage="final_notice")
+    if final_outcome == "agreed":
         conv3.outcome = "resolved"
         result.final_outcome = "resolved"
+    elif final_outcome == "hardship_requested":
+        conv3.outcome = "hardship_requested"
+        result.final_outcome = "hardship_requested"
     else:
         conv3.outcome = "no_resolution"
         result.final_outcome = "escalate"
 
     return result
+
+
+async def _llm_check_outcome(messages: list, stage: str) -> str:
+    """Use LLM-as-judge to classify conversation outcome.
+
+    Returns one of: "agreed", "hardship_requested", "none".
+    """
+    import json
+
+    # Format conversation transcript
+    transcript = "\n".join(
+        f"{msg.role.upper()}: {msg.content}"
+        for msg in messages
+    )
+
+    stage_context = {
+        "resolution": "payment plan or settlement offer",
+        "final_notice": "final payment arrangement or resolution",
+    }.get(stage, "agreement")
+
+    prompt = f"""You are reviewing a simulated debt collections conversation transcript.
+
+Transcript:
+{transcript}
+
+Classify the outcome of this conversation into exactly one of three categories:
+
+1. "agreed" — the borrower clearly agreed to a {stage_context}.
+   Signals: "yes", "okay", "I can do that", "go ahead", "sounds good", "I agree", "I accept", "I'll pay", "deal", etc.
+   Also if the agent confirmed a deal and the borrower did not object.
+
+2. "hardship_requested" — the borrower requested or was enrolled in a hardship program, financial hardship assistance, forbearance, or similar relief program.
+   Signals: mentions of "hardship", "hardship program", "financial hardship", "forbearance", "relief program", "payment pause", "reduced payments due to hardship", or the agent offered/enrolled them in a hardship program.
+
+3. "none" — neither agreement nor hardship request occurred.
+
+Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requested"}}, or {{"outcome": "none"}}"""
+
+    try:
+        client = get_openai_client()
+        response = await call_openai_with_retry(
+            client,
+            model=settings.azure_openai_deployment_mini,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=30,
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(response.choices[0].message.content or "{}")
+        outcome = result.get("outcome", "none")
+        if outcome not in ("agreed", "hardship_requested", "none"):
+            outcome = "none"
+        logger.info(f"  LLM outcome judge ({stage}): {outcome}")
+        return outcome
+    except Exception as e:
+        logger.warning(f"LLM outcome check failed for {stage}, falling back to keyword match: {e}")
+        # Fallback keyword check
+        borrower_texts = [msg.content.lower() for msg in messages if msg.role == "borrower"]
+        all_text = " ".join(borrower_texts)
+
+        hardship_keywords = [
+            "hardship", "hardship program", "financial hardship", "forbearance",
+            "relief program", "payment pause", "can't afford",
+        ]
+        if any(kw in all_text for kw in hardship_keywords):
+            return "hardship_requested"
+
+        agreement_keywords = [
+            "i agree", "i accept", "i'll pay", "i will pay", "yes", "go ahead",
+            "sounds good", "that works", "i can do that", "deal", "okay", "ok",
+            "sure", "alright", "let's do it", "set it up",
+        ]
+        if any(kw in all_text for kw in agreement_keywords):
+            return "agreed"
+
+        return "none"
 
 
 def _should_end_conversation(text: str) -> bool:

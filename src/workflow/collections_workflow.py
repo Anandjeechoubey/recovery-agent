@@ -27,7 +27,7 @@ class WorkflowState:
 
 @dataclass
 class WorkflowResult:
-    outcome: str  # "agreement", "resolved", "escalate", "no_response"
+    outcome: str  # "agreement", "resolved", "hardship_requested", "escalate", "no_response"
     stage_results: list[dict] = field(default_factory=list)
 
 
@@ -86,6 +86,13 @@ class CollectionsWorkflow:
                 outcome="agreement", stage_results=stage_results
             ).__dict__
 
+        if resolution_result["outcome"] == "hardship_requested":
+            self.state.outcome = "hardship_requested"
+            self.state.current_stage = "complete"
+            return WorkflowResult(
+                outcome="hardship_requested", stage_results=stage_results
+            ).__dict__
+
         # Stage 3: Final Notice
         self.state.current_stage = "final_notice"
         handoff_2to3 = await workflow.execute_activity(
@@ -105,6 +112,8 @@ class CollectionsWorkflow:
 
         if final_result["outcome"] == "resolved":
             self.state.outcome = "resolved"
+        elif final_result["outcome"] == "hardship_requested":
+            self.state.outcome = "hardship_requested"
         else:
             self.state.outcome = "escalate"
 

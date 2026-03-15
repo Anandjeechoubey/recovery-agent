@@ -180,9 +180,7 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav
         className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-          scrolled
-            ? "bg-slate-950/95 backdrop-blur-md border-b border-slate-800"
-            : "bg-transparent"
+          scrolled ? "bg-slate-950/95 backdrop-blur-md" : "bg-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -212,9 +210,9 @@ export default function LandingPage() {
               Integration
             </a>
           </div>
-          <Link to="/admin">
+          <Link to="/dashboard/borrowers">
             <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors">
-              Agency Dashboard →
+              Dashboard →
             </button>
           </Link>
         </div>
@@ -246,11 +244,11 @@ export default function LandingPage() {
             learning and improving with every case.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/admin">
+            <a href="https://cal.com/anand-jee-choubey/demo-apex-recovery">
               <button className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-base transition-all shadow-lg shadow-blue-600/25">
-                Open Agency Dashboard →
+                Book a demo →
               </button>
-            </Link>
+            </a>
             <a href="#how-it-works">
               <button className="px-8 py-4 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-semibold rounded-xl text-base transition-all">
                 See How It Works
@@ -378,10 +376,10 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="mt-10 flex items-center justify-center gap-3 p-4 bg-slate-800/30 rounded-xl border border-slate-700/50 max-w-lg mx-auto">
+          <div className="mt-10 flex items-center justify-center gap-3 p-4 bg-slate-800/30 rounded-xl border border-slate-700/50 max-w-xl mx-auto">
             <span className="text-slate-500 text-sm">Orchestrated by</span>
             <span className="font-mono font-bold text-white text-sm">
-              Temporal
+              Apex AI
             </span>
             <span className="text-slate-600 text-xs">
               — durable execution, automatic retries, full observability
@@ -594,9 +592,9 @@ export default function LandingPage() {
                 ApexAI handle the rest. Full workflow in minutes.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-                <Link to="/admin">
+                <Link to="/dashboard/borrowers">
                   <button className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl text-base transition-all shadow-lg shadow-blue-600/30">
-                    Open Agency Dashboard →
+                    Try it out →
                   </button>
                 </Link>
               </div>
@@ -632,7 +630,7 @@ export default function LandingPage() {
               Integration
             </a>
             <Link
-              to="/admin"
+              to="/dashboard/borrowers"
               className="hover:text-slate-300 transition-colors"
             >
               Dashboard

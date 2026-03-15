@@ -34,6 +34,8 @@ class BorrowerRow(Base):
     phone_number: Mapped[str] = mapped_column(String(20), default="")
     email: Mapped[str] = mapped_column(String(255), default="")
     workflow_id: Mapped[str] = mapped_column(String(255), nullable=True, index=True)
+    current_stage: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

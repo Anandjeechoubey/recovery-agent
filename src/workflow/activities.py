@@ -14,6 +14,7 @@ from src.agents.resolution import ResolutionAgent
 from src.config import settings
 from src.context.summarizer import summarize_for_handoff
 from src.db import repo
+from src.learning.prompt_store import PromptStore
 from src.models.borrower import Borrower
 from src.models.conversation import Conversation, HandoffSummary, Message
 from src.voice.vapi_client import VapiClient
@@ -144,13 +145,29 @@ def cleanup_manager(workflow_id: str) -> None:
     _managers.pop(workflow_id, None)
 
 
+_prompt_store = PromptStore()
+
+
+def _get_active_prompt(agent_type: str, default_prompt: str) -> str:
+    """Return the active prompt version from PromptStore, or fall back to default."""
+    try:
+        version = _prompt_store.get_active(agent_type)
+        if version:
+            return version.content
+    except Exception as e:
+        logger.warning(f"Failed to load prompt for {agent_type} from PromptStore: {e}")
+    return default_prompt
+
+
 @activity.defn
 async def run_assessment(
     borrower_dict: dict,
     workflow_id: str,
 ) -> dict:
     borrower = _dict_to_borrower(borrower_dict)
-    agent = AssessmentAgent()
+    agent = AssessmentAgent(
+        system_prompt=_get_active_prompt("assessment", AssessmentAgent.default_system_prompt)
+    )
     conversation = Conversation(borrower_id=borrower.id, agent_type="assessment")
     manager = get_manager(workflow_id)
     await manager.set_stage("assessment")
@@ -209,7 +226,9 @@ async def run_resolution(
 ) -> dict:
     borrower = _dict_to_borrower(borrower_dict)
     handoff = _dict_to_handoff(handoff_dict) if handoff_dict else None
-    agent = ResolutionAgent()
+    agent = ResolutionAgent(
+        system_prompt=_get_active_prompt("resolution", ResolutionAgent.default_system_prompt)
+    )
     conversation = Conversation(
         borrower_id=borrower.id,
         agent_type="resolution",
@@ -297,10 +316,8 @@ async def run_resolution(
             await manager.add_tracked_message("agent", "Phone call completed.", "resolution")
             conversation.add_message("system", f"Call transcript: {transcript_text}")
             # Determine outcome from transcript
-            if await _transcript_has_agreement(transcript_text):
-                conversation.outcome = "deal_agreed"
-            else:
-                conversation.outcome = "no_deal"
+            transcript_outcome = await _transcript_check_outcome(transcript_text)
+            conversation.outcome = transcript_outcome
         else:
             await manager.add_tracked_message(
                 "agent", "Call timed out or was not completed.", "resolution"
@@ -314,6 +331,13 @@ async def run_resolution(
         )
 
     await manager.end_db_conversation(conversation.outcome)
+
+    # Notify SSE of workflow outcome
+    if conversation.outcome == "deal_agreed":
+        manager.set_outcome("agreement")
+    elif conversation.outcome == "hardship_requested":
+        manager.set_outcome("hardship_requested")
+
     return StageResult(
         agent_type="resolution",
         outcome=conversation.outcome,
@@ -352,8 +376,9 @@ async def _run_resolution_chat(
         await manager.add_tracked_message("agent", response.content, "resolution")
         activity.logger.info(f"Resolution response: {response.content[:100]}")
 
-        if _deal_agreed(conversation):
-            conversation.outcome = "deal_agreed"
+        resolution_outcome = await _check_resolution_outcome(conversation)
+        if resolution_outcome != "no_deal":
+            conversation.outcome = resolution_outcome
             break
     else:
         conversation.outcome = "no_deal"
@@ -362,6 +387,13 @@ async def _run_resolution_chat(
         conversation.outcome = "no_deal"
 
     await manager.end_db_conversation(conversation.outcome)
+
+    # Notify SSE of workflow outcome
+    if conversation.outcome == "deal_agreed":
+        manager.set_outcome("agreement")
+    elif conversation.outcome == "hardship_requested":
+        manager.set_outcome("hardship_requested")
+
     return StageResult(
         agent_type="resolution",
         outcome=conversation.outcome,
@@ -377,7 +409,9 @@ async def run_final_notice(
 ) -> dict:
     borrower = _dict_to_borrower(borrower_dict)
     handoff = _dict_to_handoff(handoff_dict) if handoff_dict else None
-    agent = FinalNoticeAgent()
+    agent = FinalNoticeAgent(
+        system_prompt=_get_active_prompt("final_notice", FinalNoticeAgent.default_system_prompt)
+    )
     conversation = Conversation(
         borrower_id=borrower.id,
         agent_type="final_notice",
@@ -406,8 +440,9 @@ async def run_final_notice(
         await manager.add_tracked_message("agent", response.content, "final_notice")
         activity.logger.info(f"Final notice response: {response.content[:100]}")
 
-        if _resolved(conversation):
-            conversation.outcome = "resolved"
+        final_outcome = await _check_final_outcome(conversation)
+        if final_outcome != "no_resolution":
+            conversation.outcome = final_outcome
             break
     else:
         conversation.outcome = "no_resolution"
@@ -416,6 +451,15 @@ async def run_final_notice(
         conversation.outcome = "no_resolution"
 
     await manager.end_db_conversation(conversation.outcome)
+
+    # Notify SSE of final workflow outcome
+    if conversation.outcome == "resolved":
+        manager.set_outcome("resolved")
+    elif conversation.outcome == "hardship_requested":
+        manager.set_outcome("hardship_requested")
+    else:
+        manager.set_outcome("escalate")
+
     return StageResult(
         agent_type="final_notice",
         outcome=conversation.outcome,
@@ -463,65 +507,164 @@ def _assessment_complete(conversation: Conversation) -> bool:
     ])
 
 
-def _deal_agreed(conversation: Conversation) -> bool:
-    borrower_msgs = [m for m in conversation.messages if m.role == "borrower"]
-    if not borrower_msgs:
-        return False
-    last = borrower_msgs[-1].content.lower()
-    return any(kw in last for kw in [
-        "i agree", "i accept", "i'll pay", "i will pay", "let's do it",
-        "deal", "ok i'll do", "fine i'll", "yes", "go ahead",
-        "i can do that", "set it up", "sign me up",
-    ])
+async def _check_resolution_outcome(conversation: Conversation) -> str:
+    """Use LLM-as-judge to detect outcome in a resolution conversation.
+
+    Returns: "deal_agreed", "hardship_requested", or "no_deal".
+    """
+    result = await _llm_check_agreement(conversation, stage="resolution")
+    if result == "agreed":
+        return "deal_agreed"
+    elif result == "hardship_requested":
+        return "hardship_requested"
+    return "no_deal"
 
 
-async def _transcript_has_agreement(transcript: str) -> bool:
-    """Use LLM-as-judge to determine if the borrower agreed to a deal in the transcript."""
+async def _transcript_check_outcome(transcript: str) -> str:
+    """Use LLM-as-judge to classify a voice call transcript outcome.
+
+    Returns: "deal_agreed", "hardship_requested", or "no_deal".
+    """
     from src.config import get_openai_client, settings
+    import json
 
     prompt = f"""You are reviewing a debt collections voice call transcript.
 
 Transcript:
 {transcript}
 
-Did the borrower clearly agree to pay or accept a settlement offer during this call?
+Classify the outcome of this call into exactly one of three categories:
 
-Consider agreement signals like: "yes", "okay", "I can do that", "yeah", "go ahead", "that works",
-"I'll do it", "sounds good", or any confirmation that the agent then acknowledged.
-Also consider context — if the agent confirmed a deal and the borrower did not object, that may indicate agreement.
+1. "agreed" — the borrower clearly agreed to pay or accept a settlement offer.
+   Signals: "yes", "okay", "I can do that", "go ahead", "sounds good", "deal", etc.
 
-Respond with JSON only: {{"agreed": true}} or {{"agreed": false}}"""
+2. "hardship_requested" — the borrower requested or was enrolled in a hardship program, financial hardship assistance, forbearance, or similar relief.
+   Signals: mentions of "hardship", "hardship program", "financial hardship", "forbearance", "relief program", "payment pause", or the agent offered/enrolled them in one.
+
+3. "none" — neither agreement nor hardship request occurred.
+
+Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requested"}}, or {{"outcome": "none"}}"""
 
     try:
         client = get_openai_client()
         response = await client.chat.completions.create(
             model=settings.azure_openai_deployment_mini,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=20,
+            max_tokens=30,
             temperature=0.0,
             response_format={"type": "json_object"},
         )
-        import json
         result = json.loads(response.choices[0].message.content or "{}")
-        return bool(result.get("agreed", False))
+        outcome = result.get("outcome", "none")
+        if outcome == "agreed":
+            return "deal_agreed"
+        elif outcome == "hardship_requested":
+            return "hardship_requested"
+        return "no_deal"
     except Exception as e:
-        logger.warning(f"LLM agreement check failed, falling back to keyword match: {e}")
+        logger.warning(f"LLM transcript check failed, falling back to keyword match: {e}")
         lower = transcript.lower()
-        return any(kw in lower for kw in [
+        if any(kw in lower for kw in ["hardship", "forbearance", "relief program"]):
+            return "hardship_requested"
+        if any(kw in lower for kw in [
             "i agree", "i accept", "i'll pay", "yes", "go ahead",
             "sounds good", "that works", "i can do that", "deal",
-        ])
+        ]):
+            return "deal_agreed"
+        return "no_deal"
 
 
-def _resolved(conversation: Conversation) -> bool:
-    borrower_msgs = [m for m in conversation.messages if m.role == "borrower"]
-    if not borrower_msgs:
-        return False
-    last = borrower_msgs[-1].content.lower()
-    return any(kw in last for kw in [
-        "i accept", "i agree", "i'll take", "fine", "ok deal",
-        "i'll pay", "i will pay", "let's do", "go ahead",
-    ])
+async def _check_final_outcome(conversation: Conversation) -> str:
+    """Use LLM-as-judge to detect outcome in a final_notice conversation.
+
+    Returns: "resolved", "hardship_requested", or "no_resolution".
+    """
+    result = await _llm_check_agreement(conversation, stage="final_notice")
+    if result == "agreed":
+        return "resolved"
+    elif result == "hardship_requested":
+        return "hardship_requested"
+    return "no_resolution"
+
+
+async def _llm_check_agreement(conversation: Conversation, stage: str) -> str:
+    """Use LLM-as-judge to determine conversation outcome.
+
+    Returns one of: "agreed", "hardship_requested", "none".
+    """
+    import json
+    from src.config import get_openai_client, call_openai_with_retry, settings
+
+    if not any(m.role == "borrower" for m in conversation.messages):
+        return "none"
+
+    transcript = "\n".join(
+        f"{m.role.upper()}: {m.content}"
+        for m in conversation.messages
+        if m.role in ("agent", "borrower")
+    )
+
+    stage_context = {
+        "resolution": "payment plan or settlement offer",
+        "final_notice": "final payment arrangement or resolution",
+    }.get(stage, "agreement")
+
+    prompt = f"""You are reviewing a debt collections conversation transcript.
+
+Transcript:
+{transcript}
+
+Classify the outcome of this conversation into exactly one of three categories:
+
+1. "agreed" — the borrower clearly agreed to a {stage_context}.
+   Signals: "yes", "okay", "I can do that", "go ahead", "sounds good", "I agree", "I accept", "I'll pay", "deal", etc.
+   Also if the agent confirmed a deal and the borrower did not object.
+
+2. "hardship_requested" — the borrower requested or was enrolled in a hardship program, financial hardship assistance, forbearance, or similar relief program.
+   Signals: mentions of "hardship", "hardship program", "financial hardship", "hardship assistance", "forbearance", "relief program", "payment pause", "reduced payments due to hardship", or the agent offered/enrolled them in a hardship program.
+
+3. "none" — neither agreement nor hardship request occurred.
+
+Respond with JSON only: {{"outcome": "agreed"}}, {{"outcome": "hardship_requested"}}, or {{"outcome": "none"}}"""
+
+    try:
+        client = get_openai_client()
+        response = await call_openai_with_retry(
+            client,
+            model=settings.azure_openai_deployment_mini,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=30,
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(response.choices[0].message.content or "{}")
+        outcome = result.get("outcome", "none")
+        if outcome not in ("agreed", "hardship_requested", "none"):
+            outcome = "none"
+        logger.info(f"LLM judge ({stage}): {outcome}")
+        return outcome
+    except Exception as e:
+        logger.warning(f"LLM agreement check failed for {stage}, falling back to keyword match: {e}")
+        # Fallback keyword check
+        borrower_texts = [m.content.lower() for m in conversation.messages if m.role == "borrower"]
+        all_text = " ".join(borrower_texts)
+
+        hardship_keywords = [
+            "hardship", "hardship program", "financial hardship", "forbearance",
+            "relief program", "payment pause", "can't afford",
+        ]
+        if any(kw in all_text for kw in hardship_keywords):
+            return "hardship_requested"
+
+        agreement_keywords = [
+            "i agree", "i accept", "i'll pay", "i will pay", "yes", "go ahead",
+            "sounds good", "that works", "i can do that", "deal", "okay", "ok",
+            "sure", "alright", "let's do it", "set it up", "sign me up",
+        ]
+        if any(kw in all_text for kw in agreement_keywords):
+            return "agreed"
+
+        return "none"
 
 
 def _dict_to_borrower(d: dict) -> Borrower:

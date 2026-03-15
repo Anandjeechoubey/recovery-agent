@@ -65,14 +65,27 @@ async def start_workflow(req: StartWorkflowRequest):
 
 @router.get("/{borrower_id}/status")
 async def get_status(borrower_id: str):
-    client = await get_temporal_client()
-    workflow_id = f"collections-{borrower_id}"
+    # Resolve actual workflow_id from DB (handles seeded borrowers)
+    borrower_info = await repo.get_borrower(borrower_id)
+    if borrower_info and borrower_info.get("workflow_id"):
+        workflow_id = borrower_info["workflow_id"]
+    else:
+        workflow_id = f"collections-{borrower_id}"
+
     try:
+        client = await get_temporal_client()
         handle = client.get_workflow_handle(workflow_id)
         state = await handle.query(CollectionsWorkflow.get_state)
         return state
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except Exception:
+        # Fall back to DB-stored state (e.g. seeded borrowers with no live Temporal workflow)
+        if borrower_info:
+            return {
+                "current_stage": borrower_info.get("current_stage") or "unknown",
+                "outcome": borrower_info.get("outcome") or "unknown",
+                "attempt": 0,
+            }
+        raise HTTPException(status_code=404, detail=f"Borrower '{borrower_id}' not found")
 
 
 @router.get("/list")
@@ -89,7 +102,10 @@ async def list_workflows():
             state = await handle.query(CollectionsWorkflow.get_state)
             results.append({**info, **state})
         except Exception:
-            results.append({**info, "current_stage": "unknown", "outcome": "unknown"})
+            # Fall back to DB-stored stage/outcome (from seeded data)
+            db_stage = info.get("current_stage") or "unknown"
+            db_outcome = info.get("outcome") or "unknown"
+            results.append({**info, "current_stage": db_stage, "outcome": db_outcome})
 
     return results
 
@@ -104,3 +120,21 @@ async def cancel_workflow(borrower_id: str):
         return {"status": "cancelled"}
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{borrower_id}")
+async def delete_borrower(borrower_id: str):
+    """Delete a borrower and optionally cancel its Temporal workflow."""
+    # Try to cancel the Temporal workflow (ignore errors if not running)
+    try:
+        client = await get_temporal_client()
+        workflow_id = f"collections-{borrower_id}"
+        handle = client.get_workflow_handle(workflow_id)
+        await handle.cancel()
+    except Exception:
+        pass
+
+    deleted = await repo.delete_borrower(borrower_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Borrower not found")
+    return {"status": "deleted"}

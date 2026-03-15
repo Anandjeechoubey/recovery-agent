@@ -24,6 +24,8 @@ async def upsert_borrower(
     phone_number: str = "",
     email: str = "",
     workflow_id: str | None = None,
+    current_stage: str | None = None,
+    outcome: str | None = None,
 ) -> BorrowerRow:
     async with get_session() as session:
         result = await session.execute(
@@ -39,6 +41,10 @@ async def upsert_borrower(
             row.email = email
             if workflow_id:
                 row.workflow_id = workflow_id
+            if current_stage is not None:
+                row.current_stage = current_stage
+            if outcome is not None:
+                row.outcome = outcome
         else:
             row = BorrowerRow(
                 borrower_id=borrower_id,
@@ -50,6 +56,8 @@ async def upsert_borrower(
                 phone_number=phone_number,
                 email=email,
                 workflow_id=workflow_id,
+                current_stage=current_stage,
+                outcome=outcome,
             )
             session.add(row)
         await session.commit()
@@ -72,6 +80,8 @@ async def list_borrowers() -> list[dict]:
                 "phone_number": r.phone_number,
                 "email": r.email,
                 "workflow_id": r.workflow_id,
+                "current_stage": r.current_stage,
+                "outcome": r.outcome,
                 "started_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rows
@@ -95,8 +105,24 @@ async def get_borrower(borrower_id: str) -> dict | None:
             "phone_number": r.phone_number,
             "email": r.email,
             "workflow_id": r.workflow_id,
+            "current_stage": r.current_stage,
+            "outcome": r.outcome,
             "started_at": r.created_at.isoformat() if r.created_at else None,
         }
+
+
+async def delete_borrower(borrower_id: str) -> bool:
+    """Delete a borrower and all related conversations/messages (cascade)."""
+    async with get_session() as session:
+        result = await session.execute(
+            select(BorrowerRow).where(BorrowerRow.borrower_id == borrower_id)
+        )
+        row = result.scalar_one_or_none()
+        if not row:
+            return False
+        await session.delete(row)
+        await session.commit()
+        return True
 
 
 # ── Conversations ──────────────────────────────────────────────

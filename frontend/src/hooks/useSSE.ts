@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { getStreamUrl } from "../api/client";
+import { getChatHistory, getStreamUrl } from "../api/client";
 import type { ChatMessage } from "../api/types";
 
 interface SSEState {
@@ -7,6 +7,7 @@ interface SSEState {
   currentStage: string;
   outcome: string | null;
   connected: boolean;
+  historyLoaded: boolean;
 }
 
 export function useSSE(borrowerId: string | null) {
@@ -15,8 +16,44 @@ export function useSSE(borrowerId: string | null) {
     currentStage: "pending",
     outcome: null,
     connected: false,
+    historyLoaded: false,
   });
   const eventSourceRef = useRef<EventSource | null>(null);
+  const historyLoadedRef = useRef(false);
+
+  // Load chat history from DB on first connect
+  useEffect(() => {
+    if (!borrowerId || historyLoadedRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await getChatHistory(borrowerId);
+        if (cancelled) return;
+
+        const historyMessages: ChatMessage[] = (history.messages ?? []).filter(
+          (m: ChatMessage) => m.role !== "system"
+        );
+
+        setState((prev) => ({
+          ...prev,
+          messages: historyMessages,
+          currentStage: history.current_stage ?? prev.currentStage,
+          outcome: history.outcome && history.outcome !== "pending" ? history.outcome : prev.outcome,
+          historyLoaded: true,
+        }));
+        historyLoadedRef.current = true;
+      } catch {
+        // History load failed (e.g. no workflow yet), proceed with SSE only
+        setState((prev) => ({ ...prev, historyLoaded: true }));
+        historyLoadedRef.current = true;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [borrowerId]);
 
   const connect = useCallback(() => {
     if (!borrowerId) return;
@@ -30,10 +67,22 @@ export function useSSE(borrowerId: string | null) {
 
     es.addEventListener("message", (e) => {
       const msg: ChatMessage = JSON.parse(e.data);
-      setState((prev) => ({
-        ...prev,
-        messages: [...prev.messages, msg],
-      }));
+      setState((prev) => {
+        // Deduplicate: skip if the last message has the same content, role, and close timestamp
+        const last = prev.messages[prev.messages.length - 1];
+        if (
+          last &&
+          last.role === msg.role &&
+          last.content === msg.content &&
+          last.stage === msg.stage
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          messages: [...prev.messages, msg],
+        };
+      });
     });
 
     es.addEventListener("stage_change", (e) => {

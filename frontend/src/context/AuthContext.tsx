@@ -10,12 +10,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const STORAGE_KEY = "recoverai_token";
+const COOKIE_KEY = "recoverai_token";
 const API_BASE = "/api";
+
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name: string, value: string) {
+  const maxAge = 60 * 60 * 24 * 7; // 7 days
+  document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Strict`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; max-age=0; path=/; SameSite=Strict`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem(STORAGE_KEY)
+    () => getCookie(COOKIE_KEY)
   );
 
   async function login(email: string, password: string): Promise<void> {
@@ -31,12 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data: { access_token: string } = await res.json();
-    localStorage.setItem(STORAGE_KEY, data.access_token);
+    setCookie(COOKIE_KEY, data.access_token);
     setToken(data.access_token);
   }
 
   function logout() {
-    localStorage.removeItem(STORAGE_KEY);
+    deleteCookie(COOKIE_KEY);
     setToken(null);
   }
 

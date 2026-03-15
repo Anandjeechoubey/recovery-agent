@@ -43,8 +43,12 @@ async def send_message(borrower_id: str, req: ChatRequest):
 @router.get("/{borrower_id}/history")
 async def get_history(borrower_id: str):
     """Get conversation history from the database, with live workflow state."""
-    client = await get_temporal_client()
-    workflow_id = f"collections-{borrower_id}"
+    # Resolve actual workflow_id from DB (seeded borrowers have non-standard ids)
+    borrower_info = await repo.get_borrower(borrower_id)
+    if borrower_info and borrower_info.get("workflow_id"):
+        workflow_id = borrower_info["workflow_id"]
+    else:
+        workflow_id = f"collections-{borrower_id}"
 
     # Get persisted messages from DB
     db_messages = await repo.get_conversation_messages(workflow_id)
@@ -56,13 +60,19 @@ async def get_history(borrower_id: str):
     # Use DB messages as the primary source; fall back to live if DB is empty
     messages = db_messages if db_messages else live_messages
 
-    # Get workflow state from Temporal
-    state = {}
+    # Try Temporal for live state; fall back to DB-stored stage/outcome
+    state: dict = {}
     try:
+        client = await get_temporal_client()
         handle = client.get_workflow_handle(workflow_id)
         state = await handle.query(CollectionsWorkflow.get_state)
     except Exception:
-        pass
+        if borrower_info:
+            state = {
+                "current_stage": borrower_info.get("current_stage") or "unknown",
+                "outcome": borrower_info.get("outcome") or "unknown",
+                "attempt": 0,
+            }
 
     return {
         **state,

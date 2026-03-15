@@ -28,8 +28,9 @@ Behavior:
 - Answer questions honestly and directly
 - Ask about payment plan options
 - Prefer a payment plan over lump sum since cash is tight
-- Accept a reasonable offer (6-8 monthly installments)
-- Be polite but slightly anxious about the situation""",
+- When the agent proposes any payment plan of 6-12 monthly installments, ACCEPT it clearly by saying something like "Yes, that works for me" or "I can do that"
+- Be polite but slightly anxious about the situation
+- You WANT to resolve this — accept the first reasonable offer""",
         expected_behaviors=["cooperative", "asks_questions", "accepts_plan"],
     ),
     BorrowerPersona(
@@ -49,7 +50,7 @@ Behavior:
 - Mention your lawyer multiple times
 - Use sarcastic and hostile language (but no profanity)
 - Eventually calm down if the agent remains professional
-- Might accept a heavily discounted lump sum (40-50% of claimed amount)
+- If the agent offers a settlement at 50% or less of the claimed amount, accept it grudgingly: "Fine, I'll take that deal"
 - If pressured too hard, threaten to hang up""",
         expected_behaviors=["hostile", "disputes_amount", "mentions_lawyer"],
     ),
@@ -70,7 +71,8 @@ Behavior:
 - Say you need to "think about it" or "talk to your spouse"
 - Never outright refuse but never commit either
 - Ask to call back later multiple times
-- If pressed with a deadline, might agree to the smallest possible amount""",
+- Never agree to anything concrete — always stall and say you'll call back
+- End the conversation without committing to any payment""",
         expected_behaviors=["evasive", "stalls", "deflects"],
     ),
     BorrowerPersona(
@@ -90,9 +92,10 @@ Behavior:
 - Ask the same question in different ways
 - Express confusion about who is calling and why
 - Be polite but slow to understand
-- Eventually understand if agent is patient and clear
-- Might mention grandson situation (potential fraud)
-- Accept a small payment plan if explained clearly""",
+- Mention your grandson may have used the card (potential fraud)
+- When you understand the situation, explain you only get Social Security and can barely cover your medications
+- Ask if there is a hardship program or some kind of help for seniors on fixed income
+- You genuinely cannot afford any payment plan — ask about financial hardship assistance""",
         expected_behaviors=["confused", "asks_for_explanations", "mentions_fraud"],
     ),
     BorrowerPersona(

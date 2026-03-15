@@ -1,11 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { sendMessage, getWorkflowStatus } from "../api/client";
 import { useSSE } from "../hooks/useSSE";
 import ChatWindow from "../components/chat/ChatWindow";
 import ChatInput from "../components/chat/ChatInput";
 import StageIndicator from "../components/chat/StageIndicator";
-import VoiceCallPanel from "../components/chat/VoiceCallPanel";
 
 export default function BorrowerPage() {
   const [searchParams] = useSearchParams();
@@ -51,6 +50,30 @@ export default function BorrowerPage() {
     [connectedId]
   );
 
+  // Voice call state: active during resolution, detect "call ended" from messages
+  const voiceCall = useMemo(() => {
+    const isVoiceStage = currentStage === "resolution";
+    // Don't show voice banner if workflow already has a final outcome
+    if (!isVoiceStage || outcome !== null) return undefined;
+    // Check if any agent message indicates the call has ended
+    const callEndedMsg = messages.some(
+      (m) =>
+        m.role === "agent" &&
+        m.stage === "resolution" &&
+        (m.content.toLowerCase().includes("phone call completed") ||
+          m.content.toLowerCase().includes("call timed out") ||
+          m.content.toLowerCase().includes("call ended") ||
+          m.content.toLowerCase().includes("call failed"))
+    );
+    return {
+      active: true,
+      callEnded: callEndedMsg,
+    };
+  }, [currentStage, outcome, messages]);
+
+  const isVoiceStage = currentStage === "resolution" && outcome === null;
+  const isChatDisabled = isVoiceStage || outcome !== null;
+
   // Entry screen
   if (!connectedId) {
     return (
@@ -83,9 +106,6 @@ export default function BorrowerPage() {
     );
   }
 
-  const isVoiceStage = currentStage === "resolution";
-  const isChatDisabled = isVoiceStage || outcome !== null;
-
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <StageIndicator currentStage={currentStage} outcome={outcome} />
@@ -106,11 +126,7 @@ export default function BorrowerPage() {
           </span>
         </div>
 
-        {isVoiceStage ? (
-          <VoiceCallPanel />
-        ) : (
-          <ChatWindow messages={messages} />
-        )}
+        <ChatWindow messages={messages} voiceCall={voiceCall} />
 
         <ChatInput
           onSend={handleSendMessage}

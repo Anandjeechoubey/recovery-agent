@@ -21,6 +21,22 @@ async def stream_messages(borrower_id: str):
         cursor = 0
         heartbeat_interval = 15  # seconds
 
+        # If manager already has an outcome (reconnecting to completed workflow),
+        # flush remaining messages and send the outcome immediately.
+        if manager.outcome != "pending":
+            while cursor < len(manager.messages):
+                msg = manager.messages[cursor]
+                cursor += 1
+                if msg["role"] == "system" and msg["content"].startswith("stage_change:"):
+                    stage = msg["content"].split(":", 1)[1]
+                    yield f"event: stage_change\ndata: {json.dumps({'stage': stage})}\n\n"
+                elif msg["role"] == "system" and msg["content"].startswith("outcome:"):
+                    pass  # will send below
+                else:
+                    yield f"event: message\ndata: {json.dumps(msg)}\n\n"
+            yield f"event: outcome\ndata: {json.dumps({'outcome': manager.outcome})}\n\n"
+            return
+
         while True:
             # Wait for new messages or timeout for heartbeat
             try:
@@ -29,7 +45,17 @@ async def stream_messages(borrower_id: str):
                     timeout=heartbeat_interval,
                 )
             except asyncio.TimeoutError:
-                # Send heartbeat to keep connection alive
+                # On heartbeat, check if manager got an outcome while we waited
+                if manager.outcome != "pending":
+                    # Flush remaining messages then send outcome
+                    while cursor < len(manager.messages):
+                        msg = manager.messages[cursor]
+                        cursor += 1
+                        if msg["role"] == "system":
+                            continue
+                        yield f"event: message\ndata: {json.dumps(msg)}\n\n"
+                    yield f"event: outcome\ndata: {json.dumps({'outcome': manager.outcome})}\n\n"
+                    return
                 yield f"event: heartbeat\ndata: {{}}\n\n"
                 continue
 

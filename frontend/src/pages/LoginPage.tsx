@@ -7,7 +7,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string })?.from ?? "/admin";
+  const from = (location.state as { from?: string })?.from ?? "/dashboard/borrowers";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,9 +45,7 @@ export default function LoginPage() {
               BETA
             </span>
           </Link>
-          <p className="text-slate-500 text-sm mt-1">
-            Agency Dashboard — sign in to continue
-          </p>
+          <p className="text-slate-500 text-sm mt-1">Sign in to continue</p>
         </div>
 
         {/* Card */}

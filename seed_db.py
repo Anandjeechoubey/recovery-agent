@@ -48,8 +48,8 @@ Behavior:
 - Counter any offer with something lower
 - Cite that you have other creditors and this debt is low priority
 - Be polite but firm and businesslike
-- Accept if they go to 45% of original amount or below
-- If they won't negotiate, say you'll call back after speaking to your accountant""",
+- If they offer any settlement at 50% or less of the original amount, ACCEPT it: "Alright, I can do a one-time payment of that amount. Let's get this done."
+- You are motivated to close this out with a lump sum payment today""",
         expected_behaviors=["negotiates", "counter_offers", "knows_rights"],
     ),
     BorrowerPersona(
@@ -69,8 +69,8 @@ Behavior:
 - Never elaborate unless directly asked a specific question
 - Don't volunteer any information
 - If asked open-ended questions, give one-word or one-sentence replies
-- Eventually agree to a small monthly payment just to end the call
-- Say "whatever" or "fine" to wrap things up""",
+- When the agent proposes any monthly payment plan, agree quickly to end the call: "Fine. Yeah. Set it up."
+- You just want to stop getting calls — accept whatever payment plan they offer""",
         expected_behaviors=["terse", "minimal_engagement", "agrees_to_end_call"],
     ),
     BorrowerPersona(
@@ -91,8 +91,9 @@ Behavior:
 - Ask for the collector's full name, company address, license number
 - Refuse to confirm any personal details ("I never confirm info over the phone")
 - Ask them to send a debt validation letter per FDCPA section 809
-- Only begin to cooperate once the agent provides clear verification details
-- If the agent can verify properly, you'll agree to set up a payment plan""",
+- Do NOT agree to anything over the phone — insist on written validation first
+- End the conversation by saying "Send me the validation letter and I'll review it with my records"
+- You will NOT make any payment commitments during this call""",
         expected_behaviors=["suspicious", "demands_verification", "knows_fdcpa"],
     ),
     BorrowerPersona(
@@ -216,7 +217,14 @@ async def _seed_one(persona: BorrowerPersona, index: int, total: int) -> None:
 
     logger.info(f"[{index + 1}/{total}] {persona.name} | workflow={workflow_id}")
 
-    # 1. Upsert borrower record
+    # 1. Simulate full pipeline first to get final state
+    result = await simulate_pipeline(persona, seed=index * 100)
+
+    # Derive current_stage and outcome from simulation result
+    final_stage = result.conversations[-1].agent_type if result.conversations else "unknown"
+    final_outcome = result.final_outcome or "pending"
+
+    # 2. Upsert borrower record with stage/outcome
     await repo.upsert_borrower(
         borrower_id=borrower.id,
         name=borrower.name,
@@ -227,10 +235,9 @@ async def _seed_one(persona: BorrowerPersona, index: int, total: int) -> None:
         phone_number=borrower.phone_number,
         email=borrower.email,
         workflow_id=workflow_id,
+        current_stage=final_stage,
+        outcome=final_outcome,
     )
-
-    # 2. Simulate full pipeline
-    result = await simulate_pipeline(persona, seed=index * 100)
 
     # 3. Persist each stage conversation
     for conv in result.conversations:

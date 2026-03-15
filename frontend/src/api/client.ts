@@ -10,10 +10,15 @@ import type {
 } from "./types";
 
 const API_BASE = "/api";
-const TOKEN_KEY = "recoverai_token";
+const COOKIE_KEY = "recoverai_token";
+
+function getTokenFromCookie(): string | null {
+  const match = document.cookie.match(new RegExp("(?:^|; )" + COOKIE_KEY + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getTokenFromCookie();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -76,6 +81,19 @@ export const rollbackPrompt = (agentType: string, versionId: string) =>
   request<{ status: string }>(`/admin/prompts/${agentType}/rollback/${versionId}`, {
     method: "POST",
   });
+
+// Borrower management
+export const deleteBorrower = (borrowerId: string) =>
+  request<{ status: string }>(`/workflow/${borrowerId}`, {
+    method: "DELETE",
+  });
+
+// Docs
+export const listDocFiles = () =>
+  request<{ slug: string; filename: string }[]>("/docs/files");
+
+export const getDocFile = (slug: string) =>
+  request<{ slug: string; filename: string; content: string }>(`/docs/files/${slug}`);
 
 // Learning loop
 export const getEvolutionReport = () =>
