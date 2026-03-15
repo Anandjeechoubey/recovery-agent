@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480  # 8 hours
 
+    # Email (Gmail SMTP via App Password)
+    email_from: str = ""
+    google_app_password: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

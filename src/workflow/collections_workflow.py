@@ -12,6 +12,7 @@ with workflow.unsafe.imports_passed_through():
         run_assessment,
         run_final_notice,
         run_resolution,
+        send_email_summary,
     )
 
 
@@ -81,14 +82,22 @@ class CollectionsWorkflow:
 
         if resolution_result["outcome"] == "deal_agreed":
             self.state.outcome = "agreement"
-            self.state.current_stage = "complete"
+            await workflow.execute_activity(
+                send_email_summary,
+                args=[borrower_dict, stage_results, "agreement"],
+                start_to_close_timeout=timedelta(minutes=2),
+            )
             return WorkflowResult(
                 outcome="agreement", stage_results=stage_results
             ).__dict__
 
         if resolution_result["outcome"] == "hardship_requested":
             self.state.outcome = "hardship_requested"
-            self.state.current_stage = "complete"
+            await workflow.execute_activity(
+                send_email_summary,
+                args=[borrower_dict, stage_results, "hardship_requested"],
+                start_to_close_timeout=timedelta(minutes=2),
+            )
             return WorkflowResult(
                 outcome="hardship_requested", stage_results=stage_results
             ).__dict__
@@ -117,7 +126,12 @@ class CollectionsWorkflow:
         else:
             self.state.outcome = "escalate"
 
-        self.state.current_stage = "complete"
+        await workflow.execute_activity(
+            send_email_summary,
+            args=[borrower_dict, stage_results, self.state.outcome],
+            start_to_close_timeout=timedelta(minutes=2),
+        )
+
         return WorkflowResult(
             outcome=self.state.outcome, stage_results=stage_results
         ).__dict__

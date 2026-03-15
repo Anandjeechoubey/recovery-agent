@@ -27,7 +27,7 @@ OPENAI_API_KEY=sk-your-openai-key
 # Voice (required for live calls, optional for simulated mode)
 VAPI_API_KEY=your-vapi-api-key
 VAPI_PHONE_NUMBER_ID=your-vapi-phone-number-id
-VAPI_WEBHOOK_URL=https://your-public-url/webhook/vapi
+VAPI_WEBHOOK_URL=https://your-public-url/webhook/vapi (For local development, use ngrok to create a public URL that tunnels to your local server)
 
 # Temporal (defaults work for Docker Compose)
 TEMPORAL_HOST=localhost:7233
@@ -48,7 +48,7 @@ VOICE_MODE=simulated
 
 ```bash
 # Start all services
-docker compose up -d
+docker compose up --build -d
 
 # Check logs
 docker compose logs -f
@@ -58,6 +58,7 @@ curl http://localhost:8000/health
 ```
 
 This starts:
+
 - **PostgreSQL** (Temporal persistence)
 - **Temporal Server** (port 7233)
 - **Temporal UI** (port 8080 — visit http://localhost:8080)
@@ -96,6 +97,7 @@ make learn
 ```
 
 This will:
+
 1. Initialize prompt versions in `prompts/` directory
 2. Run 5-8 iterations of simulate → evaluate → mutate → compare
 3. Save all data to `data/evaluations/` and `data/reports/`
@@ -180,6 +182,7 @@ python -m pytest tests/ -v
 ```
 
 All 28 tests should pass. Tests cover:
+
 - Token budget enforcement (hard limits verified)
 - Compliance rule detection
 - Statistical testing logic
@@ -215,27 +218,27 @@ curl -X POST http://localhost:8000/admin/prompts/assessment/rollback/{version_id
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| Temporal worker can't connect | Ensure Temporal server is healthy: `docker compose logs temporal` |
-| OpenAI rate limits | Reduce `conversations_per_eval` in config or add delays |
-| Vapi calls not working | Check `VAPI_WEBHOOK_URL` is publicly accessible, check Vapi dashboard logs |
-| Token budget errors | Run `make test` to verify prompts fit within limits |
-| Learning loop stops early | Check `data/reports/cost_report.json` for budget status |
+| Issue                         | Solution                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| Temporal worker can't connect | Ensure Temporal server is healthy: `docker compose logs temporal`          |
+| OpenAI rate limits            | Reduce `conversations_per_eval` in config or add delays                    |
+| Vapi calls not working        | Check `VAPI_WEBHOOK_URL` is publicly accessible, check Vapi dashboard logs |
+| Token budget errors           | Run `make test` to verify prompts fit within limits                        |
+| Learning loop stops early     | Check `data/reports/cost_report.json` for budget status                    |
 
 ---
 
 ## Environment Variables Reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key |
-| `VAPI_API_KEY` | For live voice | — | Vapi API key |
-| `VAPI_PHONE_NUMBER_ID` | For live voice | — | Vapi phone number ID |
-| `VAPI_WEBHOOK_URL` | For live voice | — | Public URL for Vapi webhooks |
-| `TEMPORAL_HOST` | No | `localhost:7233` | Temporal server address |
-| `TEMPORAL_NAMESPACE` | No | `default` | Temporal namespace |
-| `TEMPORAL_TASK_QUEUE` | No | `collections` | Temporal task queue name |
-| `API_HOST` | No | `0.0.0.0` | FastAPI bind address |
-| `API_PORT` | No | `8000` | FastAPI port |
-| `VOICE_MODE` | No | `simulated` | `simulated` or `live` |
+| Variable               | Required       | Default          | Description                  |
+| ---------------------- | -------------- | ---------------- | ---------------------------- |
+| `OPENAI_API_KEY`       | Yes            | —                | OpenAI API key               |
+| `VAPI_API_KEY`         | For live voice | —                | Vapi API key                 |
+| `VAPI_PHONE_NUMBER_ID` | For live voice | —                | Vapi phone number ID         |
+| `VAPI_WEBHOOK_URL`     | For live voice | —                | Public URL for Vapi webhooks |
+| `TEMPORAL_HOST`        | No             | `localhost:7233` | Temporal server address      |
+| `TEMPORAL_NAMESPACE`   | No             | `default`        | Temporal namespace           |
+| `TEMPORAL_TASK_QUEUE`  | No             | `collections`    | Temporal task queue name     |
+| `API_HOST`             | No             | `0.0.0.0`        | FastAPI bind address         |
+| `API_PORT`             | No             | `8000`           | FastAPI port                 |
+| `VOICE_MODE`           | No             | `simulated`      | `simulated` or `live`        |

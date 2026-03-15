@@ -75,7 +75,6 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./src:/app/src
-      - ./frontend/dist:/app/frontend/dist
       - ./data:/app/data
       - ./prompts:/app/prompts
 

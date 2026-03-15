@@ -25,7 +25,14 @@
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/workflow/activities.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/workflow/collections_workflow.py''\\).read\\(\\)\\); ast.parse\\(open\\(''src/learning/simulator.py''\\).read\\(\\)\\); print\\(''All OK''\\)\")",
       "Bash(python -c \"import ast; ast.parse\\(open\\(''src/learning/personas.py''\\).read\\(\\)\\); ast.parse\\(open\\(''seed_db.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
       "Bash(grep -r employment_status /Users/anandjeechoubey/pilots/recovery-agents --include=*.md --include=*.json)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(/usr/local/bin/npm install:*)",
+      "Bash(/opt/homebrew/bin/npm install:*)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(npm --prefix /Users/anandjeechoubey/pilots/recovery-agents/frontend install remark-gfm)",
+      "Bash(grep -r \"typography\\\\|@tailwind\" /Users/anandjeechoubey/pilots/recovery-agents/frontend/tailwind.config*)",
+      "Bash(npm --prefix /Users/anandjeechoubey/pilots/recovery-agents/frontend install @tailwindcss/typography)",
+      "Bash(docker-compose restart:*)"
     ]
   }
 }

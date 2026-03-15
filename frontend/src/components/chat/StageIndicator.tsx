@@ -1,6 +1,6 @@
 const STAGES = [
   { key: "assessment", label: "Assessment", number: 1 },
-  { key: "resolution", label: "Resolution (Voice)", number: 2 },
+  { key: "resolution", label: "Resolution", number: 2 },
   { key: "final_notice", label: "Final Notice", number: 3 },
 ];
 
@@ -25,15 +25,19 @@ export default function StageIndicator({ currentStage, outcome }: Props) {
                   isActive
                     ? "bg-blue-600 text-white"
                     : isComplete
-                    ? "bg-green-500 text-white"
-                    : "bg-gray-200 text-gray-500"
+                      ? "bg-green-500 text-white"
+                      : "bg-gray-200 text-gray-500"
                 }`}
               >
                 {isComplete && !isActive ? "\u2713" : stage.number}
               </div>
               <span
                 className={`ml-2 text-sm font-medium ${
-                  isActive ? "text-blue-600" : isComplete ? "text-green-600" : "text-gray-400"
+                  isActive
+                    ? "text-blue-600"
+                    : isComplete
+                      ? "text-green-600"
+                      : "text-gray-400"
                 }`}
               >
                 {stage.label}
@@ -55,8 +59,8 @@ export default function StageIndicator({ currentStage, outcome }: Props) {
             outcome === "agreement" || outcome === "resolved"
               ? "bg-green-100 text-green-800"
               : outcome === "escalate"
-              ? "bg-red-100 text-red-800"
-              : "bg-yellow-100 text-yellow-800"
+                ? "bg-red-100 text-red-800"
+                : "bg-yellow-100 text-yellow-800"
           }`}
         >
           {outcome.toUpperCase()}

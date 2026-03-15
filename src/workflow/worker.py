@@ -9,6 +9,7 @@ from src.workflow.activities import (
     run_assessment,
     run_final_notice,
     run_resolution,
+    send_email_summary,
 )
 from src.workflow.collections_workflow import CollectionsWorkflow
 
@@ -20,7 +21,7 @@ async def main() -> None:
         client,
         task_queue=settings.temporal_task_queue,
         workflows=[CollectionsWorkflow],
-        activities=[run_assessment, run_resolution, run_final_notice, create_handoff],
+        activities=[run_assessment, run_resolution, run_final_notice, create_handoff, send_email_summary],
     )
 
     print(f"Worker started on task queue: {settings.temporal_task_queue}")

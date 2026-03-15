@@ -14,6 +14,7 @@ from src.agents.resolution import ResolutionAgent
 from src.config import settings
 from src.context.summarizer import summarize_for_handoff
 from src.db import repo
+from src.email_sender import send_email
 from src.learning.prompt_store import PromptStore
 from src.models.borrower import Borrower
 from src.models.conversation import Conversation, HandoffSummary, Message
@@ -334,6 +335,8 @@ async def run_resolution(
 
     # Notify SSE of workflow outcome
     if conversation.outcome == "deal_agreed":
+        confirmation = await _generate_deal_confirmation(conversation, borrower)
+        await manager.add_tracked_message("agent", confirmation, "resolution")
         manager.set_outcome("agreement")
     elif conversation.outcome == "hardship_requested":
         manager.set_outcome("hardship_requested")
@@ -390,6 +393,8 @@ async def _run_resolution_chat(
 
     # Notify SSE of workflow outcome
     if conversation.outcome == "deal_agreed":
+        confirmation = await _generate_deal_confirmation(conversation, borrower)
+        await manager.add_tracked_message("agent", confirmation, "resolution")
         manager.set_outcome("agreement")
     elif conversation.outcome == "hardship_requested":
         manager.set_outcome("hardship_requested")
@@ -695,3 +700,116 @@ def _dict_to_handoff(d: dict) -> HandoffSummary:
         token_count=d["token_count"],
         source_agent=d["source_agent"],
     )
+
+
+async def _generate_deal_confirmation(conversation: Conversation, borrower: Borrower) -> str:
+    """Use LLM to generate a concise deal confirmation message for the chat."""
+    from src.config import get_openai_client, call_openai_with_retry, settings
+
+    transcript = "\n".join(
+        f"{m.role.upper()}: {m.content}"
+        for m in conversation.messages
+        if m.role in ("agent", "borrower")
+    )
+
+    prompt = f"""You are a collections agent confirming a debt resolution agreement.
+
+Based on the conversation below, write a concise confirmation message to the borrower summarising exactly what they have agreed to. Include:
+- The specific settlement amount or monthly payment and number of installments
+- Any payment start date or deadline mentioned
+- A note that written confirmation will follow
+
+Keep it under 80 words. Be direct and professional. Do not include any sign-off, name, company, or closing pleasantry after "Thank you" — end there.
+
+Conversation:
+{transcript}"""
+
+    try:
+        client = get_openai_client()
+        response = await call_openai_with_retry(
+            client,
+            model=settings.azure_openai_deployment_mini,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=150,
+            temperature=0.2,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"Failed to generate deal confirmation via LLM: {e}")
+        return (
+            f"Thank you, {borrower.name}. To confirm: you have agreed to a resolution arrangement "
+            f"for your account ending in {borrower.account_last4}. "
+            "You will receive written confirmation of the agreed terms shortly. Thank you."
+        )
+
+
+@activity.defn
+async def send_email_summary(borrower_dict: dict, stage_results: list[dict], workflow_outcome: str) -> bool:
+    """Send a workflow summary email to the borrower."""
+    borrower = _dict_to_borrower(borrower_dict)
+    if not borrower.email:
+        logger.info("No borrower email — skipping summary email")
+        return False
+
+    from src.config import get_openai_client, call_openai_with_retry
+
+    # Build a readable transcript of all stages
+    all_lines: list[str] = []
+    for result in stage_results:
+        stage = result.get("agent_type", "unknown").replace("_", " ").title()
+        all_lines.append(f"--- {stage} ---")
+        for msg in result.get("messages", []):
+            role = msg["role"].upper()
+            all_lines.append(f"{role}: {msg['content']}")
+        all_lines.append("")
+
+    transcript = "\n".join(all_lines)
+
+    outcome_label = {
+        "agreement": "Agreement Reached",
+        "resolved": "Account Resolved",
+        "hardship_requested": "Hardship Program Referral",
+        "escalate": "Escalated — No Resolution",
+        "no_response": "No Response",
+    }.get(workflow_outcome, workflow_outcome.replace("_", " ").title())
+
+    prompt = f"""You are summarising a debt collections workflow for a borrower.
+
+Borrower: {borrower.name}
+Account ending: {borrower.account_last4}
+Outstanding balance: ${borrower.total_debt:,.2f}
+Outcome: {outcome_label}
+
+Conversation transcript:
+{transcript}
+
+Write a professional, plain-text email body (no subject line, no greeting header needed) that:
+1. States the outcome clearly in the first sentence
+2. If an agreement was reached, summarises the specific terms agreed upon
+3. Lists any next steps the borrower should take
+4. Keeps a professional but empathetic tone
+5. Is under 200 words"""
+
+    try:
+        client = get_openai_client()
+        response = await call_openai_with_retry(
+            client,
+            model=settings.azure_openai_deployment_mini,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.3,
+        )
+        email_body = response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.warning(f"LLM email summary generation failed: {e}")
+        email_body = (
+            f"Dear {borrower.name},\n\n"
+            f"This email summarises your recent interaction with Apex Recovery Services "
+            f"regarding your account ending in {borrower.account_last4}.\n\n"
+            f"Outcome: {outcome_label}\n\n"
+            "Please contact us if you have any questions.\n\n"
+            "Apex Recovery Services"
+        )
+
+    subject = f"Your Account Summary — {outcome_label} | Account ...{borrower.account_last4}"
+    return await send_email(borrower.email, subject, email_body)

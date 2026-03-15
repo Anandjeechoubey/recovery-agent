@@ -22,6 +22,7 @@ from src.workflow.activities import (
     run_assessment,
     run_final_notice,
     run_resolution,
+    send_email_summary,
 )
 from src.workflow.collections_workflow import CollectionsWorkflow
 
@@ -43,7 +44,7 @@ async def _run_worker() -> None:
             client,
             task_queue=settings.temporal_task_queue,
             workflows=[CollectionsWorkflow],
-            activities=[run_assessment, run_resolution, run_final_notice, create_handoff],
+            activities=[run_assessment, run_resolution, run_final_notice, create_handoff, send_email_summary],
         )
         print(f"[WORKER] Embedded worker started on queue: {settings.temporal_task_queue}", flush=True)
         await worker.run()
